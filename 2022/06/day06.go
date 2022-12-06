@@ -9,14 +9,15 @@ import (
 func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 	bytesRead := 0
+	numUnique := 14
 
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		for i := 0; i < len(line) - 4; i++ {
+		for i := 0; i < len(line) - numUnique; i++ {
 			dup := false
-			for j := i; j < i + 3; j++ {
-				for k := j + 1; k < i + 4; k++ {
+			for j := i; j < i + numUnique - 1; j++ {
+				for k := j + 1; k < i + numUnique; k++ {
 					if line[j] == line[k] {
 						dup = true
 						break
@@ -25,7 +26,7 @@ func main() {
 			}
 
 			if !dup {
-				bytesRead = i + 4
+				bytesRead = i + numUnique
 				break
 			}
 		}
