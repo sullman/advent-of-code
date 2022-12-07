@@ -8,6 +8,8 @@ import (
 )
 
 const Threshold = 100000
+const TotalMem = 70000000
+const RequiredFree = 30000000
 
 // This is surely not the simplest approach, but it seemed like it'd be fun to
 // build a trie!
@@ -42,6 +44,18 @@ func Part1(dir *Directory, parentPath string) int {
 	}
 
 	return matchingSize
+}
+
+func Part2(dir *Directory, target int, best int) int {
+	if dir.TotalSize >= target && dir.TotalSize < best {
+		best = dir.TotalSize
+	}
+
+	for _, child := range dir.Children {
+		best = Part2(child, target, best)
+	}
+
+	return best
 }
 
 func main() {
@@ -81,4 +95,7 @@ func main() {
 	}
 
 	fmt.Println(Part1(root, ""))
+
+	freeSize := TotalMem - root.TotalSize
+	fmt.Println(Part2(root, RequiredFree - freeSize, TotalMem))
 }
