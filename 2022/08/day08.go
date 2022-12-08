@@ -17,52 +17,79 @@ func main() {
 		visible = append(visible, make([]bool, len(line)))
 	}
 
-	// Check horizontal visibility
-	for row := 0; row < len(trees); row++ {
-		prev := byte(0)
-		for col := 0; col < len(trees[row]); col++ {
-			if trees[row][col] > prev {
-				visible[row][col] = true
-				prev = trees[row][col]
-			}
-		}
-
-		prev = 0
-		for col := len(trees[row]) - 1; col >= 0; col-- {
-			if trees[row][col] > prev {
-				visible[row][col] = true
-				prev = trees[row][col]
-			}
-		}
-	}
-
-	// Check vertical visibility
-	for col := 0; col < len(trees[0]); col++ {
-		prev := byte(0)
-		for row := 0; row < len(trees); row++ {
-			if trees[row][col] > prev {
-				visible[row][col] = true
-				prev = trees[row][col]
-			}
-		}
-
-		prev = 0
-		for row := len(trees) - 1; row >= 0; row-- {
-			if trees[row][col] > prev {
-				visible[row][col] = true
-				prev = trees[row][col]
-			}
-		}
-	}
-
 	numVisible := 0
-	for row := 0; row < len(visible); row++ {
-		for col := 0; col < len(visible[row]); col++ {
-			if visible[row][col] {
+	maxScenicScore := 0
+	for row := 0; row < len(trees); row++ {
+		for col := 0; col < len(trees[row]); col++ {
+			visible := false
+
+			visibleUp := 1
+			for r := row - 1; r >= 0; r-- {
+				if trees[row][col] > trees[r][col] {
+					visibleUp++
+				} else {
+					break
+				}
+			}
+
+			if row == visibleUp - 1 {
+				visibleUp--
+				visible = true
+			}
+
+			visibleDown := 1
+			for r := row + 1; r < len(trees); r++ {
+				if trees[row][col] > trees[r][col] {
+					visibleDown++
+				} else {
+					break
+				}
+			}
+
+			if row + visibleDown == len(trees) {
+				visibleDown--
+				visible = true
+			}
+
+			visibleLeft := 1
+			for c := col - 1; c >= 0; c-- {
+				if trees[row][col] > trees[row][c] {
+					visibleLeft++
+				} else {
+					break
+				}
+			}
+
+			if col == visibleLeft - 1 {
+				visibleLeft--
+				visible = true
+			}
+
+			visibleRight := 1
+			for c := col + 1; c < len(trees[row]); c++ {
+				if trees[row][col] > trees[row][c] {
+					visibleRight++
+				} else {
+					break
+				}
+			}
+
+			if col + visibleRight == len(trees[row]) {
+				visibleRight--
+				visible = true
+			}
+
+			if visible {
 				numVisible++
+			}
+
+			scenicScore := visibleLeft * visibleUp * visibleRight * visibleDown
+			if scenicScore > maxScenicScore {
+				maxScenicScore = scenicScore
 			}
 		}
 	}
 
 	fmt.Println(numVisible)
+	fmt.Println(maxScenicScore)
 }
