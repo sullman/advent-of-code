@@ -6,14 +6,47 @@ import (
 	"os"
 )
 
+type Position struct {
+	x int
+	y int
+}
+
+func reconcile(positions []Position, index int) {
+	dx := positions[index - 1].x - positions[index].x
+	dy := positions[index - 1].y - positions[index].y
+	move := false
+
+	if dx == 2 {
+		dx = 1
+		move = true
+	} else if dx == -2 {
+		dx = -1
+		move = true
+	}
+
+	if dy == 2 {
+		dy = 1
+		move = true
+	} else if dy == -2 {
+		dy = -1
+		move = true
+	}
+
+	if move {
+		positions[index].x += dx
+		positions[index].y += dy
+		if index < len(positions) - 1 {
+			reconcile(positions, index + 1)
+		}
+	}
+}
+
+const NumKnots = 10
+
 func main() {
 	scanner := bufio.NewScanner(os.Stdin)
+	positions := make([]Position, NumKnots)
 	visited := make(map[string]bool)
-
-	headX := 0
-	headY := 0
-	tailX := 0
-	tailY := 0
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -35,36 +68,10 @@ func main() {
 		}
 
 		for i := 0; i < count; i++ {
-			headX += dx
-			headY += dy
-
-			tdx := headX - tailX
-			tdy := headY - tailY
-			move := false
-
-			switch {
-			case tdx == 2:
-				tdx = 1
-				move = true
-			case tdx == -2:
-				tdx = -1
-				move = true
-			case tdy == 2:
-				tdy = 1
-				move = true
-			case tdy == -2:
-				tdy = -1
-				move = true
-			}
-
-			if move {
-				tailX += tdx
-				tailY += tdy
-			}
-
-			// fmt.Printf("Head now at %d,%d and tail at %d,%d\n", headX, headY, tailX, tailY)
-
-			visited[fmt.Sprintf("%d,%d", tailX, tailY)] = true
+			positions[0].x += dx
+			positions[0].y += dy
+			reconcile(positions, 1)
+			visited[fmt.Sprintf("%d,%d", positions[NumKnots - 1].x, positions[NumKnots - 1].y)] = true
 		}
 	}
 
