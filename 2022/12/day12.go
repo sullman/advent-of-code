@@ -96,4 +96,37 @@ func main() {
 			}
 		}
 	}
+
+	// For part 2, we can basically just go backwards
+	for r := 0; r < rows; r++ {
+		for c := 0; c < cols; c++ {
+			visited[r][c] = false
+		}
+	}
+	penalty := rows * cols
+	candidates.Init()
+	candidates.PushFront(&Path{ row: endRow, col: endCol, steps: 0, possible: penalty })
+
+	for {
+		elem := candidates.Front()
+		path := candidates.Remove(elem).(*Path)
+
+		if grid[path.row][path.col] == 0 {
+			fmt.Println(path.steps)
+			break
+		}
+
+		// visited[path.row][path.col] = true
+
+		for i := 0; i < 4; i++ {
+			newRow := path.row + deltas[i]
+			newCol := path.col + deltas[i+1]
+			if newRow >= 0 && newRow < rows && newCol >= 0 && newCol < cols && !visited[newRow][newCol] && grid[path.row][path.col] - 1 <= grid[newRow][newCol] {
+				visited[newRow][newCol] = true
+				newPath := &Path{ row: newRow, col: newCol, steps: path.steps + 1, possible: path.steps + 1 + penalty }
+				// insertSorted(candidates, newPath)
+				candidates.PushBack(newPath)
+			}
+		}
+	}
 }
