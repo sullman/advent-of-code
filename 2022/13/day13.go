@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"sort"
 )
 
 const (
@@ -18,7 +17,6 @@ type Packet struct {
 	index int
 	bufferedVal int
 	bufferedParens int
-	special bool
 }
 
 func NewPacket(str string) *Packet {
@@ -100,38 +98,37 @@ func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 	index := 0
 	sum := 0
-	packets := make([]*Packet, 2)
-	packets[0] = NewPacket("[[2]]")
-	packets[0].special = true
-	packets[1] = NewPacket("[[6]]")
-	packets[1].special = true
+	special1 := NewPacket("[[2]]")
+	special2 := NewPacket("[[6]]")
+	special1Index := 1
+	special2Index := 2
 
 	for scanner.Scan() {
 		index++
 		left := NewPacket(scanner.Text())
-		packets = append(packets, left)
 		scanner.Scan()
 		right := NewPacket(scanner.Text())
-		packets = append(packets, right)
 		scanner.Scan()
 
 		if Compare(left, right) {
 			sum += index
 		}
-	}
 
-	fmt.Println(sum)
+		if Compare(left, special1) {
+			special1Index++
+			special2Index++
+		} else if Compare(left, special2) {
+			special2Index++
+		}
 
-	sort.Slice(packets, func(i, j int) bool {
-		return Compare(packets[i], packets[j])
-	})
-
-	product := 1
-	for i, p := range packets {
-		if p.special {
-			product *= i + 1
+		if Compare(right, special1) {
+			special1Index++
+			special2Index++
+		} else if Compare(right, special2) {
+			special2Index++
 		}
 	}
 
-	fmt.Println(product)
+	fmt.Println(sum)
+	fmt.Println(special1Index * special2Index)
 }
