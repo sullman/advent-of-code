@@ -76,4 +76,34 @@ func main() {
 	}
 
 	fmt.Println(numSand)
+
+	// The beginning will proceed the same as part 1, so we can simply avoid
+	// resetting grid and numSand. It wouldn't be that much harder to combine
+	// the loops instead of copy/paste, but I'm lazy.
+	startStr := fmt.Sprintf("%d,%d", StartX, StartY)
+
+	for grid[startStr] == Air {
+		x, y = StartX, StartY
+		for {
+			if y == maxY + 1 {
+				grid[fmt.Sprintf("%d,%d", x, y)] = Sand
+				numSand++
+				break
+			} else if grid[fmt.Sprintf("%d,%d", x, y + 1)] == Air {
+				y++
+			} else if grid[fmt.Sprintf("%d,%d", x - 1, y + 1)] == Air {
+				x--
+				y++
+			} else if grid[fmt.Sprintf("%d,%d", x + 1, y + 1)] == Air {
+				x++
+				y++
+			} else {
+				grid[fmt.Sprintf("%d,%d", x, y)] = Sand
+				numSand++
+				break
+			}
+		}
+	}
+
+	fmt.Println(numSand)
 }
