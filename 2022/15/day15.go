@@ -12,6 +12,7 @@ type Range struct {
 
 // const TargetY = 10
 const TargetY = 2000000
+const MaxSize = TargetY * 2
 
 func Abs(num int) int {
 	if num < 0 {
@@ -31,9 +32,39 @@ func Max(x int, y int) int {
 	return y
 }
 
+func AddRange(l *list.List, start int, end int) {
+	r := &Range{start: start, end: end}
+	for e := l.Front(); e != nil; {
+		other := e.Value.(*Range)
+		var remove *list.Element
+
+		if r.start <= other.start && r.end >= other.start - 1 {
+			remove = e
+			r.end = Max(r.end, other.end)
+		} else if other.start <= r.start && other.end >= r.start - 1 {
+			remove = e
+			r.start = Min(r.start, other.start)
+			r.end = Max(r.end, other.end)
+		}
+
+		e = e.Next()
+
+		if remove != nil {
+			l.Remove(remove)
+		}
+	}
+
+	l.PushBack(r)
+}
+
 func main() {
 	beacons := make(map[int]int)
 	ranges := list.New()
+	allRanges := make([]*list.List, MaxSize + 1)
+
+	for i := 0; i <= MaxSize; i++ {
+		allRanges[i] = list.New()
+	}
 
 	for {
 		var sensorX, sensorY, beaconX, beaconY int
@@ -41,33 +72,15 @@ func main() {
 		if n != 4 { break }
 
 		distance := Abs(sensorX - beaconX) + Abs(sensorY - beaconY)
-		dx := distance - Abs(sensorY - TargetY)
+		minRow := Max(0, sensorY - distance)
+		maxRow := Min(MaxSize, sensorY + distance)
 
-		if dx > 0 {
-			r := &Range{start: sensorX - dx, end: sensorX + dx}
-			fmt.Printf("Can't be in %d..%d\n", r.start, r.end)
-			for e := ranges.Front(); e != nil; {
-				other := e.Value.(*Range)
-				var remove *list.Element
-
-				if r.start <= other.start && r.end >= other.start {
-					remove = e
-					r.end = Max(r.end, other.end)
-				} else if other.start <= r.start && other.end >= r.start {
-					remove = e
-					r.start = Min(r.start, other.start)
-					r.end = Max(r.end, other.end)
-				}
-
-				e = e.Next()
-
-				if remove != nil {
-					// fmt.Printf("Combined %d..%d + %d..%d -> %d..%d\n", other.start, other.end, sensorX - dx, sensorX + dx, r.start, r.end)
-					ranges.Remove(remove)
-				}
+		for row := minRow; row <= maxRow; row++ {
+			dx := distance - Abs(sensorY - row)
+			AddRange(allRanges[row], Max(0, sensorX - dx), Min(MaxSize, sensorX + dx))
+			if row == TargetY {
+				AddRange(ranges, sensorX - dx, sensorX + dx)
 			}
-
-			ranges.PushBack(r)
 		}
 
 		if beaconY == TargetY {
@@ -82,4 +95,12 @@ func main() {
 	}
 	impossible -= len(beacons)
 	fmt.Println(impossible)
+
+	for row := 0; row <= MaxSize; row++ {
+		if allRanges[row].Len() != 1 {
+			// We're not sorting the ranges, so have to look at both and take the min
+			col := 1 + Min(allRanges[row].Front().Value.(*Range).end, allRanges[row].Back().Value.(*Range).end)
+			fmt.Println(row + 4000000 * col)
+		}
+	}
 }
