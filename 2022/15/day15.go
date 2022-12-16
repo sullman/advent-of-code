@@ -10,6 +10,22 @@ type Range struct {
 	end int
 }
 
+type Rectangle struct {
+	N, E, S, W int
+}
+
+func (r *Rectangle) Valid() bool {
+	return r.N > r.S && r.E > r.W
+}
+
+func Rotate(x int, y int) (int, int) {
+	return x + y, y - x
+}
+
+func RotateBack(x int, y int) (int, int) {
+	return (x - y) / 2, (x + y) / 2
+}
+
 // const TargetY = 10
 const TargetY = 2000000
 const MaxSize = TargetY * 2
@@ -57,14 +73,66 @@ func AddRange(l *list.List, start int, end int) {
 	l.PushBack(r)
 }
 
+func SplitRectangles(l *list.List, off *Rectangle) {
+	// fmt.Printf("Checking %v against current set of rectangles\n", *off)
+	for e := l.Front(); e != nil; {
+		rect := e.Value.(*Rectangle)
+		overlap := &Rectangle{}
+		// fmt.Printf("Comparing to %v\n", *rect)
+
+		overlap.N = Min(rect.N, off.N)
+		overlap.E = Min(rect.E, off.E)
+		overlap.S = Max(rect.S, off.S)
+		overlap.W = Max(rect.W, off.W)
+		// fmt.Printf("Overlap is %v\n", *overlap)
+
+		if !overlap.Valid() {
+			e = e.Next()
+			continue
+		}
+
+		// We can create four _potential_ rectangles that result from removing the
+		// overlap. For the sake of visualization, imagine a 3x3 square where the
+		// overlap is in the middle:
+		//
+		// LTR
+		// LOR
+		// LBR
+		//
+		// So there's a rectangle on the left, the right, and smaller ones on the
+		// top and bottom. If the overlap isn't in the middle, some of the
+		// rectangles will be invalid, but they're computed the same way.
+
+		left := &Rectangle{N: rect.N, E: overlap.W, S: rect.S, W: rect.W}
+		if (left.Valid()) { l.PushFront(left) }
+		top := &Rectangle{N: rect.N, E: overlap.E, S: overlap.N, W: overlap.W}
+		if (top.Valid()) { l.PushFront(top) }
+		right := &Rectangle{N: rect.N, E: rect.E, S: rect.S, W: overlap.E}
+		if (right.Valid()) { l.PushFront(right) }
+		bottom := &Rectangle{N: overlap.S, E: overlap.E, S: rect.S, W: overlap.W}
+		if (bottom.Valid()) { l.PushFront(bottom) }
+
+		remove := e
+		e = e.Next()
+		l.Remove(remove)
+	}
+
+	// fmt.Printf("Now tracking %d rectangles\n", l.Len())
+}
+
 func main() {
 	beacons := make(map[int]int)
 	ranges := list.New()
-	allRanges := make([]*list.List, MaxSize + 1)
+	candidates := list.New()
+	square := Rectangle{}
 
-	for i := 0; i <= MaxSize; i++ {
-		allRanges[i] = list.New()
-	}
+	// Rotating the rest of the squares is simple, but rotating the initial grid is awkward
+	possible := &Rectangle{}
+	_, possible.N = Rotate(0, MaxSize)
+	possible.E, _ = Rotate(MaxSize, MaxSize)
+	_, possible.S = Rotate(MaxSize, 0)
+	possible.W, _ = Rotate(0, 0)
+	candidates.PushFront(possible)
 
 	for {
 		var sensorX, sensorY, beaconX, beaconY int
@@ -72,20 +140,21 @@ func main() {
 		if n != 4 { break }
 
 		distance := Abs(sensorX - beaconX) + Abs(sensorY - beaconY)
-		minRow := Max(0, sensorY - distance)
-		maxRow := Min(MaxSize, sensorY + distance)
+		dx := distance - Abs(sensorY - TargetY)
 
-		for row := minRow; row <= maxRow; row++ {
-			dx := distance - Abs(sensorY - row)
-			AddRange(allRanges[row], Max(0, sensorX - dx), Min(MaxSize, sensorX + dx))
-			if row == TargetY {
-				AddRange(ranges, sensorX - dx, sensorX + dx)
-			}
+		if dx > 0 {
+			AddRange(ranges, sensorX - dx, sensorX + dx)
 		}
 
 		if beaconY == TargetY {
 			beacons[beaconX] = beaconY
 		}
+
+		// top -> E,N
+		// bottom -> W,S
+		square.E, square.N = Rotate(sensorX, sensorY + distance)
+		square.W, square.S = Rotate(sensorX, sensorY - distance)
+		SplitRectangles(candidates, &square)
 	}
 
 	impossible := 0
@@ -96,11 +165,15 @@ func main() {
 	impossible -= len(beacons)
 	fmt.Println(impossible)
 
-	for row := 0; row <= MaxSize; row++ {
-		if allRanges[row].Len() != 1 {
-			// We're not sorting the ranges, so have to look at both and take the min
-			col := 1 + Min(allRanges[row].Front().Value.(*Range).end, allRanges[row].Back().Value.(*Range).end)
-			fmt.Println(row + 4000000 * col)
+	for e := candidates.Front(); e != nil; e = e.Next() {
+		rect := e.Value.(*Rectangle)
+		// Checking for a delta of 2 here feels a bit like an off-by-one error
+		// we're getting away with?
+		if rect.N - 2 == rect.S && rect.E - 2 == rect.W {
+			x, y := RotateBack(rect.W + 1, rect.S + 1)
+			fmt.Println(x, y)
+			fmt.Println(x * 4000000 + y)
 		}
+		// fmt.Println(e.Value.(*Rectangle))
 	}
 }
