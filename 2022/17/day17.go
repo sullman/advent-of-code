@@ -4,19 +4,6 @@ import (
 	"fmt"
 )
 
-type Space byte
-
-const (
-	Air Space = iota
-	Settled
-	Falling
-)
-
-func Max(x int, y int) int {
-	if x > y { return x }
-	return y
-}
-
 type CycleState struct {
 	numRocks int
 	maxHeight int
@@ -25,50 +12,42 @@ type CycleState struct {
 // const MaxRocks = 2022
 const MaxRocks = 1000000000000
 
-func MemoKey(grid [][7]Space, maxRow int, shape int, jet int) string {
-	key := fmt.Sprintf("%d %d ", shape, jet)
-	for row := maxRow; row > 0 && row > maxRow - 20; row-- {
-		for i := 0; i < len(grid[0]); i++ {
-			key = key + fmt.Sprint(grid[row % len(grid)][i])
-		}
-	}
-	return key
+var Shapes = [][]byte{
+	{0b00011110},
+	{0b00001000, 0b00011100, 0b00001000},
+	{0b00011100, 0b00000100, 0b00000100},
+	{0b00010000, 0b00010000, 0b00010000, 0b00010000},
+	{0b00011000, 0b00011000},
 }
 
 func main() {
-	shapeTops := [5][8]int {
-		{0, 0, 4, 4, 4, 4, 0, 4},
-		{0, 0, 5, 6, 5, 0, 0, 6},
-		{0, 0, 4, 4, 6, 0, 0, 6},
-		{0, 0, 7, 0, 0, 0, 0, 7},
-		{0, 0, 5, 5, 0, 0, 0, 5},
-	}
-	shapeBottoms := [5][7]int {
-		{0, 0, 4, 4, 4, 4, 0},
-		{0, 0, 5, 4, 5, 0, 0},
-		{0, 0, 4, 4, 4, 0, 0},
-		{0, 0, 4, 0, 0, 0, 0},
-		{0, 0, 4, 4, 0, 0, 0},
-	}
-	var grid [100][7]Space
-	fallingTop := 0
+	// We'll add to it if necessary, but since each row is just a byte we might
+	// as well preallocate a decent chunk of memory instead of shifting it every
+	// time we append.
+	grid := make([]byte, 4096)
+	grid[0] = 0b11111111
+
 	fallingBottom := 0
 	var jets string
 	jetIndex := 0
 	maxSettledHeight := 0
 	numRocks := 0
-	maxRow := len(grid) - 1
-	patterns := make(map[string]CycleState)
-
-	for i := 0; i < len(grid[0]); i++ {
-		grid[0][i] = Settled
-	}
+	patterns := make(map[uint64]CycleState)
 
 	fmt.Scanln(&jets)
 
 	for numRocks < MaxRocks {
-		shape := numRocks % len(shapeTops)
-		memo := MemoKey(grid[0:], maxSettledHeight, shape, jetIndex)
+		shapeIndex := numRocks % len(Shapes)
+
+		// Construct a memo key that factors in relevant state. We definitely need
+		// the shape index (3 bits) and jet index (14 bits), which leaves enough
+		// room to include the top 6 rows from the grid and use a uint64.
+		var memo uint64
+		for row := maxSettledHeight; row > 0 && row > maxSettledHeight - 6; row-- {
+			memo = (memo << 8) | uint64(grid[row])
+		}
+		memo = memo | (uint64(jetIndex) << 47) | (uint64(shapeIndex) << 61)
+
 		prev, pattern := patterns[memo]
 		if pattern {
 			// fmt.Printf("Found a pattern after %d rocks / %d height! Last time %d / %d\n", numRocks, maxSettledHeight, prev.numRocks, prev.maxHeight)
@@ -87,73 +66,42 @@ func main() {
 			patterns[memo] = CycleState{numRocks, maxSettledHeight}
 		}
 
-		neededRows := maxSettledHeight + shapeTops[shape][7] + 1
 		fallingBottom = maxSettledHeight + 4
-		fallingTop = maxSettledHeight + 4
-		for row := maxRow + 1; row <= neededRows; row++ {
-			for i := 0; i < len(grid[0]); i++ {
-				grid[row % len(grid)][i] = Air
-			}
+		falling := make([]byte, len(Shapes[shapeIndex]))
+		for i := 0; i < len(falling); i++ {
+			falling[i] = Shapes[shapeIndex][i]
 		}
-		maxRow = neededRows
 
-		for i := 0; i < len(grid[0]); i++ {
-			for row := shapeBottoms[shape][i]; row > 0 && row <= shapeTops[shape][i]; row++ {
-				fallingTop = Max(fallingTop, maxSettledHeight + row)
-				grid[(maxSettledHeight + row) % len(grid)][i] = Falling
-			}
+		neededRows := fallingBottom + len(falling) + 1
+		for len(grid) < neededRows {
+			grid = append(grid, 0)
 		}
+
 
 		for {
 			// Jet left/right
-			if jets[jetIndex] == '<' {
-				canMove := true
-				for row := fallingBottom; row <= fallingTop; row++ {
-					if grid[row % len(grid)][0] == Falling {
+			canMove := true
+			for i, mask := range falling {
+				check := grid[fallingBottom + i]
+				if jets[jetIndex] == '<' {
+					if mask & 0b01000000 != 0 || (mask << 1) & check != 0 {
 						canMove = false
 						break
 					}
-					for i := 1; i < len(grid[0]); i++ {
-						if grid[row % len(grid)][i] == Falling && grid[row % len(grid)][i - 1] == Settled {
-							canMove = false
-							break
-						}
-					}
-				}
-
-				if canMove {
-					for row := fallingBottom; row <= fallingTop; row++ {
-						for i := 1; i < len(grid[0]); i++ {
-							if grid[row % len(grid)][i] == Falling {
-								grid[row % len(grid)][i - 1] = Falling
-								grid[row % len(grid)][i] = Air
-							}
-						}
-					}
-				}
-			} else {
-				canMove := true
-				for row := fallingBottom; row <= fallingTop; row++ {
-					if grid[row % len(grid)][len(grid[0]) - 1] == Falling {
+				} else {
+					if mask & 0b00000001 != 0 || (mask >> 1) & check != 0 {
 						canMove = false
 						break
 					}
-					for i := 0; i < len(grid[0]) - 1; i++ {
-						if grid[row % len(grid)][i] == Falling && grid[row % len(grid)][i + 1] == Settled {
-							canMove = false
-							break
-						}
-					}
 				}
+			}
 
-				if canMove {
-					for row := fallingBottom; row <= fallingTop; row++ {
-						for i := len(grid[0]) - 2; i >= 0; i-- {
-							if grid[row % len(grid)][i] == Falling {
-								grid[row % len(grid)][i + 1] = Falling
-								grid[row % len(grid)][i] = Air
-							}
-						}
+			if canMove {
+				for i := 0; i < len(falling); i++ {
+					if jets[jetIndex] == '<' {
+						falling[i] = falling[i] << 1
+					} else {
+						falling[i] = falling[i] >> 1
 					}
 				}
 			}
@@ -162,34 +110,22 @@ func main() {
 
 			// Fall down
 			canFall := true
-			for row := fallingBottom; canFall && row <= fallingTop; row++ {
-				for i := 0; i < len(grid[0]); i++ {
-					if grid[row % len(grid)][i] == Falling && grid[(row - 1) % len(grid)][i] == Settled {
-						canFall = false
-						break
-					}
+			for i, mask := range falling {
+				check := grid[fallingBottom + i - 1]
+				if mask & check != 0 {
+					canFall = false
+					break
 				}
 			}
 
 			if canFall {
-				for row := fallingBottom; row <= fallingTop; row++ {
-					for i := 0; i < len(grid[0]); i++ {
-						if grid[row % len(grid)][i] == Falling {
-							grid[(row - 1) % len(grid)][i] = Falling
-							grid[row % len(grid)][i] = Air
-						}
-					}
-				}
 				fallingBottom--
-				fallingTop--
 			} else {
-				for row := fallingBottom; row <= fallingTop; row++ {
-					for i := 0; i < len(grid[0]); i++ {
-						if grid[row % len(grid)][i] == Falling {
-							grid[row % len(grid)][i] = Settled
-							maxSettledHeight = Max(maxSettledHeight, row)
-						}
+				for i, mask := range falling {
+					if fallingBottom + i > maxSettledHeight {
+						maxSettledHeight = fallingBottom + i
 					}
+					grid[fallingBottom + i] = grid[fallingBottom + i] | mask
 				}
 				numRocks++
 				break
