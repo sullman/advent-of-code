@@ -10,6 +10,11 @@ type Element struct {
 	prev *Element
 }
 
+// const DecryptionKey = 1
+// const Iterations = 1
+const DecryptionKey = 811589153
+const Iterations = 10
+
 func main() {
 	originalOrder := make([]*Element, 0)
 	var zero *Element
@@ -20,7 +25,7 @@ func main() {
 		n, _ := fmt.Scanf("%d\n", &num)
 		if n != 1 { break }
 		elem := new(Element)
-		elem.value = num
+		elem.value = num * DecryptionKey
 		if prev == nil {
 			elem.next = elem
 			elem.prev = elem
@@ -37,35 +42,30 @@ func main() {
 		}
 	}
 
-	for _, elem := range originalOrder {
-		/*
-		fmt.Println("")
-		for i, e := 0, zero; i < len(originalOrder); i, e = i + 1, e.next {
-			fmt.Println(e.value)
-		}
-		*/
+	for iteration := 0; iteration < Iterations; iteration++ {
+		for _, elem := range originalOrder {
+			if elem.value > 0 {
+				for i := 0; i < elem.value % (len(originalOrder) - 1); i++ {
+					prev, next, nextNext := elem.prev, elem.next, elem.next.next
 
-		if elem.value > 0 {
-			for i := 0; i < elem.value; i++ {
-				prev, next, nextNext := elem.prev, elem.next, elem.next.next
+					prev.next = next
+					next.prev = prev
+					next.next = elem
+					elem.prev = next
+					elem.next = nextNext
+					nextNext.prev = elem
+				}
+			} else if elem.value < 0 {
+				for i := 0; i > elem.value % (len(originalOrder) - 1); i-- {
+					prevPrev, prev, next := elem.prev.prev, elem.prev, elem.next
 
-				prev.next = next
-				next.prev = prev
-				next.next = elem
-				elem.prev = next
-				elem.next = nextNext
-				nextNext.prev = elem
-			}
-		} else if elem.value < 0 {
-			for i := 0; i > elem.value; i-- {
-				prevPrev, prev, next := elem.prev.prev, elem.prev, elem.next
-
-				prevPrev.next = elem
-				elem.prev = prevPrev
-				elem.next = prev
-				prev.prev = elem
-				prev.next = next
-				next.prev = prev
+					prevPrev.next = elem
+					elem.prev = prevPrev
+					elem.next = prev
+					prev.prev = elem
+					prev.next = next
+					next.prev = prev
+				}
 			}
 		}
 	}
