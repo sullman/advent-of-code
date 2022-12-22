@@ -18,6 +18,7 @@ type State struct {
 	supply Counts
 	building Counts
 	nextBuild string
+	bestPossible int
 	blueprint *Blueprint
 }
 
@@ -30,6 +31,7 @@ func NewState(other *State) *State {
 	if other != nil {
 		state.time = other.time
 		state.blueprint = other.blueprint
+		state.bestPossible = other.bestPossible
 		for key, val := range other.robots {
 			state.robots[key] = val
 		}
@@ -83,10 +85,9 @@ func ReadBlueprint() *Blueprint {
 	return b
 }
 
-var OrderedTypes = []string{"geode", "obsidian", "clay", "ore"}
+var OrderedTypes = []string{"ore", "clay", "obsidian", "geode"}
 
 func NextBuilds(state *State, newStates *[]*State) {
-	numBuilds := 0
 	for _, buildType := range OrderedTypes {
 		costs := state.blueprint.costs[buildType]
 		shouldBuildNext := buildType == "geode" || state.robots[buildType] < state.blueprint.max[buildType]
@@ -100,14 +101,12 @@ func NextBuilds(state *State, newStates *[]*State) {
 			newState := NewState(state)
 			newState.nextBuild = buildType
 			*newStates = append(*newStates, newState)
-			numBuilds++
-			// Bad heuristic, neutering it
-			if numBuilds >= 4 { break }
 		}
 	}
 }
 
-const MaxMinutes = 24
+// const MaxMinutes = 24
+const MaxMinutes = 32
 
 func main() {
 	blueprints := make([]*Blueprint, 0)
@@ -119,28 +118,31 @@ func main() {
 	}
 
 	total := 0
+	product := 1
 
 	for _, bp := range blueprints {
+		if MaxMinutes == 32 && bp.id > 3 { break }
 		fmt.Printf("Running Blueprint %d\n", bp.id)
 
 		initial := NewState(nil)
 		initial.blueprint = bp
 		initial.robots["ore"] = 1
+		initial.bestPossible = MaxMinutes * (MaxMinutes + 1) / 2
 		states := make([]*State, 0, 200)
 		NextBuilds(initial, &states)
 		best := initial
 		visited := make(map[string]bool)
-		lastTime := 0
 
 		for len(states) > 0 {
-			state := states[0]
-			states = states[1:]
+			// Pop from the end of the stack to make this depth first. By going depth
+			// first, we can hopefully find a plausible solution quickly and then
+			// aggressively prune anything that can't top it.
+			state := states[len(states) - 1]
+			states = states[0:(len(states) - 1)]
 
-			visitedKey := fmt.Sprintf("%d %s %v %v", state.time, state.nextBuild, state.robots, state.supply)
-			if visited[visitedKey] {
+			if state.bestPossible < best.supply["geode"] {
 				continue
 			}
-			visited[visitedKey] = true
 
 			if state.time == MaxMinutes {
 				if state.supply["geode"] > best.supply["geode"] {
@@ -149,13 +151,13 @@ func main() {
 				continue
 			}
 
-			state.time++
-
-			// fmt.Println(state)
-			if state.time > lastTime || state.time > 20 {
-				lastTime = state.time
-				// fmt.Println(state)
+			visitedKey := fmt.Sprintf("%d %s %v %v", state.time, state.nextBuild, state.robots, state.supply)
+			if visited[visitedKey] {
+				continue
 			}
+			visited[visitedKey] = true
+
+			state.time++
 
 			// Build, if we can
 			canBuild := true
@@ -191,6 +193,12 @@ func main() {
 					s.building[key] = 0
 				}
 
+				// Calculate the best possible geode count from here. The tighter this
+				// is, the more efficient the solution. But it's currently *very*
+				// generous.
+				timeRemaining := MaxMinutes - s.time
+				s.bestPossible = s.supply["geode"] + (timeRemaining * s.robots["geode"]) + (timeRemaining * (timeRemaining + 1) / 2)
+
 				states = append(states, s)
 			}
 		}
@@ -198,7 +206,9 @@ func main() {
 		fmt.Println(best.supply["geode"])
 
 		total += bp.id * best.supply["geode"]
+		product *= best.supply["geode"]
 	}
 
-	fmt.Println(total)
+	fmt.Printf("Quality score: %d\n", total)
+	fmt.Printf("Product: %d\n", product)
 }
