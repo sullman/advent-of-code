@@ -5,15 +5,97 @@ import (
 	"strconv"
 )
 
-type Formula struct {
-	left string
-	right string
+type Element struct {
+	name string
+	value int
+	known bool
+	left *Element
+	right *Element
 	operator rune
 }
 
+func GetValue(elem *Element, part2 bool) (int, bool) {
+	if part2 && elem.name == "humn" {
+		return 0, false
+	} else if elem.known {
+		return elem.value, true
+	}
+
+	leftVal, leftKnown := GetValue(elem.left, part2)
+	rightVal, rightKnown := GetValue(elem.right, part2)
+
+	if !leftKnown || !rightKnown {
+		return 0, false
+	}
+
+	var value int
+
+	switch elem.operator {
+	case '+':
+		value = leftVal + rightVal
+	case '-':
+		value = leftVal - rightVal
+	case '*':
+		value = leftVal * rightVal
+	case '/':
+		value = leftVal / rightVal
+	default:
+		panic("Unknown operator")
+	}
+
+	elem.value = value
+	elem.known = true
+
+	return value, true
+}
+
+func MakeEqual(elem *Element, value int) {
+	fmt.Printf("%s needs to equal %d\n", elem.name, value)
+	if elem.name == "humn" {
+		fmt.Println(value)
+		return
+	}
+
+	leftVal, leftKnown := GetValue(elem.left, true)
+	rightVal, rightKnown := GetValue(elem.right, true)
+
+	if leftKnown {
+		var needed int
+		switch elem.operator {
+		case '+':
+			needed = value - leftVal
+		case '-':
+			needed = leftVal - value
+		case '*':
+			needed = value / leftVal
+		case '/':
+			needed = leftVal / value
+		default:
+			panic("Unknown operator")
+		}
+		MakeEqual(elem.right, needed)
+	} else if rightKnown {
+		var needed int
+		switch elem.operator {
+		case '+':
+			needed = value - rightVal
+		case '-':
+			needed = value + rightVal
+		case '*':
+			needed = value / rightVal
+		case '/':
+			needed = value * rightVal
+		default:
+			panic("Unknown operator")
+		}
+		MakeEqual(elem.left, needed)
+	} else {
+		panic("humn is on both sides!?")
+	}
+}
+
 func main() {
-	values := make(map[string]int)
-	formulas := make(map[string]*Formula)
+	elements := make(map[string]*Element)
 
 	for {
 		var name string
@@ -21,58 +103,56 @@ func main() {
 		if n != 1 { break }
 		name = name[0:(len(name) - 1)]
 
+		elem := elements[name]
+		if elem == nil {
+			elem = &Element{name: name}
+			elements[name] = elem
+		}
+
 		var left, right string
 		var operator rune
 		n, _ = fmt.Scanf("%s %c %s\n", &left, &operator, &right)
 
 		if n == 1 {
-			values[name], _ = strconv.Atoi(left)
+			elem.value, _ = strconv.Atoi(left)
+			elem.known = true
 		} else {
-			formula := &Formula{left, right, operator}
-			formulas[name] = formula
-		}
-	}
+			elem.operator = operator
 
-	fmt.Printf("Parsed %d values, %d formulas\n", len(values), len(formulas))
-	fmt.Println(formulas["root"])
-
-	stack := make([]string, 1, len(formulas))
-	stack[0] = "root"
-
-	for len(stack) > 0 {
-		monkey := stack[len(stack) - 1]
-		if _, exists := values[monkey]; exists {
-			stack = stack[0:(len(stack) - 1)]
-			continue
-		}
-
-		formula := formulas[monkey]
-		leftVal, leftExists := values[formula.left]
-		rightVal, rightExists := values[formula.right]
-
-		if leftExists && rightExists {
-			switch formula.operator {
-			case '+':
-				values[monkey] = leftVal + rightVal
-			case '-':
-				values[monkey] = leftVal - rightVal
-			case '*':
-				values[monkey] = leftVal * rightVal
-			case '/':
-				values[monkey] = leftVal / rightVal
-			default:
-				panic("Unknown operator")
+			elem.left = elements[left]
+			if elem.left == nil {
+				elem.left = &Element{name: left}
+				elements[left] = elem.left
 			}
-			stack = stack[0:(len(stack) - 1)]
-		} else {
-			if !leftExists {
-				stack = append(stack, formula.left)
-			}
-			if !rightExists {
-				stack = append(stack, formula.right)
+
+			elem.right = elements[right]
+			if elem.right == nil {
+				elem.right = &Element{name: right}
+				elements[right] = elem.right
 			}
 		}
 	}
 
-	fmt.Println(values["root"])
+	root := elements["root"]
+	GetValue(root, false)
+	fmt.Println(root.value)
+
+	// Reset computed state for part 2
+	for _, elem := range elements {
+		if elem.left != nil {
+			elem.value = 0
+			elem.known = false
+		}
+	}
+
+	leftVal, leftKnown := GetValue(root.left, true)
+	rightVal, rightKnown := GetValue(root.right, true)
+
+	if leftKnown {
+		MakeEqual(root.right, leftVal)
+	} else if rightKnown {
+		MakeEqual(root.left, rightVal)
+	} else {
+		panic("humn is on both sides!?")
+	}
 }
