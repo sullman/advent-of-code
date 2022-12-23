@@ -54,10 +54,18 @@ func main() {
 		}
 	}
 
-	for round := 0; round < 10; round++ {
+	for round := 0; ; round++ {
 		proposed := make(map[string]int)
 
+		minRow, maxRow := 1000000, -1000000
+		minCol, maxCol := 1000000, -1000000
+
 		for _, elf := range elfList {
+			if elf.row < minRow { minRow = elf.row }
+			if elf.row > maxRow { maxRow = elf.row }
+			if elf.col < minCol { minCol = elf.col }
+			if elf.col > maxCol { maxCol = elf.col }
+
 			var proposal *Movement
 			allClear := true
 			for i := round; i < round + len(Checks); i++ {
@@ -86,6 +94,11 @@ func main() {
 			}
 		}
 
+		if round == 10 {
+			fmt.Printf("In round %d, bounding rectangle is %dx%d\n", round, maxRow - minRow + 1, maxCol - minCol + 1)
+			fmt.Println((maxRow - minRow + 1) * (maxCol - minCol + 1) - len(elfMap))
+		}
+
 		if len(proposed) == 0 {
 			fmt.Printf("In round %d, everything is stable!\n", round + 1)
 			break
@@ -102,16 +115,4 @@ func main() {
 			}
 		}
 	}
-
-	minRow, maxRow := 1000000, -1000000
-	minCol, maxCol := 1000000, -1000000
-	for _, elf := range elfList {
-		if elf.row < minRow { minRow = elf.row }
-		if elf.row > maxRow { maxRow = elf.row }
-		if elf.col < minCol { minCol = elf.col }
-		if elf.col > maxCol { maxCol = elf.col }
-	}
-
-	fmt.Printf("Bounding rectangle is %dx%d\n", maxRow - minRow + 1, maxCol - minCol + 1)
-	fmt.Println((maxRow - minRow + 1) * (maxCol - minCol + 1) - len(elfMap))
 }
