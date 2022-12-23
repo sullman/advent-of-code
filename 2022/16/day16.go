@@ -1,67 +1,131 @@
 package main
 
 import (
-	"container/list"
 	"fmt"
-	"strings"
+	"sort"
 )
 
 type Valve struct {
 	name string
 	flowRate int
-	tunnels []string
 }
 
 type State struct {
 	time int
-	valve string
+	target string
+	distance int
 	released int
 	releasing int
-	open string
-	maxPossible int
+	remaining []*Valve
+	bestPossible int
 }
 
-const Minutes = 30
-var BestYet = 0
+func ComputeBestPossible(state *State, valves *map[string]*Valve, maxTime int) int {
+	timeRemaining := maxTime - state.time + 1
+	possible := state.released + state.releasing * timeRemaining
 
-func InsertSorted(l *list.List, state *State, visited map[string]int) {
-	key := fmt.Sprintf("%s %s", state.valve, state.open)
-	prev := visited[key]
-	if prev > 0 && prev <= state.time {
-		// fmt.Printf("Not revisiting %s %d < %d\n", key, prev, state.time)
-		return
-	}
-	visited[key] = state.time
-	// fmt.Printf("Going to visit %s\n", key)
-	if state.released > BestYet {
-		fmt.Printf("New best yet %d %s\n", state.released, state.open)
-		BestYet = state.released
+	target := (*valves)[state.target]
+	if target != nil && state.distance < timeRemaining {
+		possible += target.flowRate * (timeRemaining - state.distance)
 	}
 
-	for e := l.Front(); e != nil; e = e.Next() {
-		other := e.Value.(*State)
-		if state.maxPossible >= other.maxPossible {
-			l.InsertBefore(state, e)
-			return
+	for _, v := range state.remaining {
+		if timeRemaining <= 0 { break }
+		possible += v.flowRate * timeRemaining
+		timeRemaining--
+	}
+
+	return possible
+}
+
+func Part1(valves *map[string]*Valve, distances *map[string]map[string]int) int {
+	relevantValves := make([]*Valve, 0)
+	for _, v := range *valves {
+		if v.flowRate > 0 {
+			relevantValves = append(relevantValves, v)
+		}
+	}
+	sort.Slice(relevantValves, func(i, j int) bool {
+		return relevantValves[i].flowRate > relevantValves[j].flowRate
+	})
+
+	best := 0
+	stack := make([]*State, 1)
+	stack[0] = &State{
+		time: 0,
+		target: "AA",
+		distance: 0,
+		released: 0,
+		releasing: 0,
+		remaining: relevantValves,
+		bestPossible: 1000000,
+	}
+
+	for len(stack) > 0 {
+		// Using a stack makes this depth first, which will hopefully let us find a
+		// plausible solution quickly and then aggressively prune anything that can't
+		// top it.
+		state := stack[len(stack) - 1]
+		stack = stack[0:(len(stack) - 1)]
+
+		// fmt.Printf("Evaluating t=%d target=%s(%d) released=%d releasing=%d remaining=%v best=%d\n", state.time, state.target, state.distance, state.released, state.releasing, state.remaining, state.bestPossible)
+
+		if state.time == 31 {
+			if state.released > best {
+				fmt.Printf("New best: %d\n", state.released)
+				best = state.released
+			}
+			continue
+		} else if state.bestPossible < best {
+			continue
+		}
+
+		// Track visited states?
+
+		state.time++
+		state.released += state.releasing
+
+		if state.distance > 0 {
+			state.distance--
+			state.bestPossible = ComputeBestPossible(state, valves, 30)
+			stack = append(stack, state)
+		} else {
+			state.releasing += (*valves)[state.target].flowRate
+			// fmt.Printf("Opening %s, now releasing %d\n", state.target, state.releasing)
+
+			if len(state.remaining) == 0 {
+				state.released += state.releasing * (30 - state.time + 1)
+				state.time = 31
+				stack = append(stack, state)
+			} else {
+				for _, next := range state.remaining {
+					remaining := make([]*Valve, 0, len(state.remaining) - 1)
+					for _, v := range state.remaining {
+						if v.name != next.name {
+							remaining = append(remaining, v)
+						}
+					}
+					s := &State{
+						time: state.time,
+						target: next.name,
+						distance: (*distances)[state.target][next.name],
+						released: state.released,
+						releasing: state.releasing,
+						remaining: remaining,
+					}
+					s.bestPossible = ComputeBestPossible(s, valves, 30)
+					stack = append(stack, s)
+				}
+			}
 		}
 	}
 
-	l.PushBack(state)
-}
-
-func Dump(l *list.List, prefix string) {
-	fmt.Printf("%s ", prefix)
-	for e := l.Front(); e != nil; e = e.Next() {
-		state := e.Value.(*State)
-		fmt.Printf("%s %s;", state.valve, state.open)
-	}
-	fmt.Println()
+	return best
 }
 
 func main() {
 	valves := make(map[string]*Valve)
-	totalRate := 0
-	initialValve := ""
+	distances := make(map[string]map[string]int)
 
 	for {
 		var name string
@@ -76,85 +140,36 @@ func main() {
 		valve := &Valve{
 			name: name,
 			flowRate: rate,
-			tunnels: make([]string, 0),
 		}
 		valves[name] = valve
-		totalRate += rate
 
-		if initialValve == "" {
-			initialValve = name
-		}
+		distances[name] = make(map[string]int)
 
 		for sep == ',' {
 			fmt.Scanf("%2s%c", &next, &sep)
-			valve.tunnels = append(valve.tunnels, next)
+			distances[name][next] = 1
 		}
 	}
 
-	initialValve = "AA"
-	visited := make(map[string]int)
-	candidates := list.New()
-	initial := &State{
-		time: 0,
-		valve: initialValve,
-		released: 0,
-		releasing: 0,
-		open: "",
-		maxPossible: Minutes * totalRate,
+	for through, _ := range valves {
+		for from, _ := range valves {
+			for to, _ := range valves {
+				before, after := distances[from][through], distances[through][to]
+				if before != 0 && after != 0 {
+					dist := before + after
+					if distances[from][to] == 0 || dist < distances[from][to] {
+						distances[from][to] = dist
+					}
+				}
+			}
+		}
 	}
-	candidates.PushFront(initial)
 
-	for candidates.Len() > 0 {
-		// Dump(candidates, "Before:")
-		e := candidates.Front()
-		state := candidates.Remove(e).(*State)
-		// fmt.Printf("%d %v\n", len(visited), state)
-
-		if state.time == Minutes + 1 {
-			fmt.Println(state.released)
-			candidates.Init()
-			break
-		}
-
-		if state.releasing == totalRate {
-			total := state.released + (state.releasing * (Minutes - state.time))
-			next := &State{
-				time: Minutes + 1,
-				valve: state.valve + "!",
-				released: total,
-				releasing: state.releasing,
-				open: state.open,
-				maxPossible: total,
-			}
-			InsertSorted(candidates, next, visited)
-			continue
-		}
-
-		valve := valves[state.valve]
-
-		if valve.flowRate > 0 && !strings.Contains(state.open, state.valve) {
-			next := &State{
-				time: state.time + 1,
-				valve: state.valve,
-				released: state.released + state.releasing,
-				releasing: state.releasing + valve.flowRate,
-				open: state.open + "," + state.valve,
-				maxPossible: state.released + state.releasing + (Minutes - state.time - 1) * totalRate,
-			}
-			InsertSorted(candidates, next, visited)
-		}
-
-		for _, nextValve := range valve.tunnels {
-			next := &State{
-				time: state.time + 1,
-				valve: nextValve,
-				released: state.released + state.releasing,
-				releasing: state.releasing,
-				open: state.open,
-				maxPossible: state.released + state.releasing + (Minutes - state.time - 1) * totalRate,
-			}
-			InsertSorted(candidates, next, visited)
-		}
-		// Dump(candidates, "After:")
+	/*
+	for from, _ := range valves {
+		fmt.Printf("Distances from %s: %v\n", from, distances[from])
 	}
+	*/
+
+	fmt.Println(Part1(&valves, &distances))
 }
