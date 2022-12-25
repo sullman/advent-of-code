@@ -1,5 +1,11 @@
 package main
 
+// TODO: Memory efficient! Share blizzard state across all states in a single
+// array of maps
+
+// TODO: Use a slice of targets to do part 2. Each time we hit an intermediate
+// target, clean up after ourselves.
+
 import (
 	"container/list"
 	"fmt"
@@ -12,12 +18,16 @@ type Blizzard struct {
 	colMotion int
 }
 
+type Target struct {
+	row int
+	col int
+}
+
 type State struct {
 	row int
 	col int
 	minutes int
 	bestPossible int
-	blizzards []Blizzard
 }
 
 type Movement struct {
@@ -59,8 +69,9 @@ func main() {
 	var lastOpenCol int
 	var char byte
 
-	initial := &State{}
-	initial.blizzards = make([]Blizzard, 0)
+	blizzards := make([]Blizzard, 0)
+	blocked := make([]map[string]bool, 1)
+	blocked[0] = make(map[string]bool)
 
 	for {
 		n, _ := fmt.Scanf("%c", &char)
@@ -76,13 +87,13 @@ func main() {
 		} else if char == '.' {
 			lastOpenCol = col
 		} else if char == '>' {
-			initial.blizzards = append(initial.blizzards, Blizzard{row, col, 0, 1})
+			blizzards = append(blizzards, Blizzard{row, col, 0, 1})
 		} else if char == 'v' {
-			initial.blizzards = append(initial.blizzards, Blizzard{row, col, 1, 0})
+			blizzards = append(blizzards, Blizzard{row, col, 1, 0})
 		} else if char == '<' {
-			initial.blizzards = append(initial.blizzards, Blizzard{row, col, 0, -1})
+			blizzards = append(blizzards, Blizzard{row, col, 0, -1})
 		} else if char == '^' {
-			initial.blizzards = append(initial.blizzards, Blizzard{row, col, -1, 0})
+			blizzards = append(blizzards, Blizzard{row, col, -1, 0})
 		}
 
 		col++
@@ -91,10 +102,15 @@ func main() {
 	numRows = row
 	endCol = lastOpenCol
 	maxRow, maxCol := numRows - 1, numCols - 1
-	initial.col = startCol
+	initial := &State{col: startCol}
 	initial.bestPossible = Distance(initial.row, initial.col, maxRow, endCol)
+	targets := []Target{
+		{maxRow, endCol},
+		{0, startCol},
+		{maxRow, endCol},
+	}
 
-	fmt.Printf("Read %d rows, %d cols, %d blizzards, starting at 0,%d and ending at %d,%d\n", numRows, numCols, len(initial.blizzards), startCol, maxRow, endCol)
+	fmt.Printf("Read %d rows, %d cols, %d blizzards, starting at 0,%d and ending at %d,%d\n", numRows, numCols, len(blizzards), startCol, maxRow, endCol)
 
 	states := list.New()
 	states.PushFront(initial)
@@ -105,28 +121,33 @@ func main() {
 		state := states.Remove(elem).(*State)
 		// fmt.Printf("Checking %v\n", state)
 
-		if state.row == maxRow {
-			fmt.Printf("Made it out in %d minutes\n", state.minutes)
-			break
+		if state.row == targets[0].row && state.col == targets[0].col {
+			fmt.Printf("Reached %d,%d in %d minutes\n", state.row, state.col, state.minutes)
+			targets = targets[1:]
+			if len(targets) == 0 { break }
+			visited = make(map[string]bool)
+			for e := states.Front(); e != nil; e = states.Front() {
+				states.Remove(e)
+			}
 		}
 
-		newBlizzards := make([]Blizzard, len(state.blizzards))
-		blocked := make(map[string]bool)
+		if len(blocked) - 1 == state.minutes {
+			blocked = append(blocked, make(map[string]bool))
 
-		for i := 0; i < len(state.blizzards); i++ {
-			newRow := state.blizzards[i].row + state.blizzards[i].rowMotion
-			newCol := state.blizzards[i].col + state.blizzards[i].colMotion
+			for i := 0; i < len(blizzards); i++ {
+				newRow := blizzards[i].row + blizzards[i].rowMotion
+				newCol := blizzards[i].col + blizzards[i].colMotion
 
-			if newRow == 0 { newRow = maxRow - 1 }
-			if newRow == maxRow { newRow = 1 }
-			if newCol == 0 { newCol = maxCol - 1 }
-			if newCol == maxCol { newCol = 1 }
+				if newRow == 0 { newRow = maxRow - 1 }
+				if newRow == maxRow { newRow = 1 }
+				if newCol == 0 { newCol = maxCol - 1 }
+				if newCol == maxCol { newCol = 1 }
 
-			newBlizzards[i] = state.blizzards[i]
-			newBlizzards[i].row = newRow
-			newBlizzards[i].col = newCol
+				blizzards[i].row = newRow
+				blizzards[i].col = newCol
 
-			blocked[fmt.Sprintf("%d,%d", newRow, newCol)] = true
+				blocked[state.minutes][fmt.Sprintf("%d,%d", newRow, newCol)] = true
+			}
 		}
 
 		for _, move := range Movements {
@@ -135,7 +156,7 @@ func main() {
 
 			// fmt.Printf("Checking %d,%d blocked=%t\n", newRow, newCol, blocked[fmt.Sprintf("%d,%d", newRow, newCol)])
 
-			if blocked[fmt.Sprintf("%d,%d", newRow, newCol)] { continue }
+			if blocked[state.minutes][fmt.Sprintf("%d,%d", newRow, newCol)] { continue }
 
 			memoKey := fmt.Sprintf("%d,%d,%d", state.minutes + 1, newRow, newCol)
 			if visited[memoKey] { continue }
@@ -146,8 +167,7 @@ func main() {
 					row: newRow,
 					col: newCol,
 					minutes: state.minutes + 1,
-					bestPossible: state.minutes + 1 + Distance(newRow, newCol, maxRow, endCol),
-					blizzards: newBlizzards,
+					bestPossible: state.minutes + 1 + Distance(newRow, newCol, targets[0].row, targets[0].col),
 				}
 				InsertSorted(states, s)
 			}
