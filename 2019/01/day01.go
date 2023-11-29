@@ -9,7 +9,8 @@ import (
 
 func main() {
 	scanner := bufio.NewScanner(os.Stdin)
-	sum := 0
+	naiveFuel := 0
+	fullFuel := 0
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -17,9 +18,20 @@ func main() {
 		if len(line) > 0 {
 			mass, _ := strconv.Atoi(line)
 			fuel := (mass / 3) - 2
-			sum += fuel
+			naiveFuel += fuel
+			fullFuel += fuel
+
+			for {
+				fuel = (fuel / 3) - 2
+				if fuel > 0 {
+					fullFuel += fuel
+				} else {
+					break
+				}
+			}
 		}
 	}
 
-	fmt.Println(sum)
+	fmt.Printf("Part 1: %d\n", naiveFuel)
+	fmt.Printf("Part 2: %d\n", fullFuel)
 }
