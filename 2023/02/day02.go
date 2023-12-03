@@ -18,10 +18,12 @@ var Limits = map[string]int{
 func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 	sum := 0
+	powerSum := 0
 
 	re := regexp.MustCompile(`(\d+) (blue|red|green)(,|;|$)`)
 
 	for scanner.Scan() {
+		maxes := map[string]int{}
 		line := scanner.Text()
 		before, after, found := strings.Cut(line, ":")
 		if !found { break }
@@ -34,14 +36,17 @@ func main() {
 			color := match[2]
 			if Limits[color] < count {
 				possible = false
-				break
 			}
+			maxes[color] = max(maxes[color], count)
 		}
 
 		if possible {
 			sum += gameNum
 		}
+
+		powerSum += maxes["blue"] * maxes["green"] * maxes["red"]
 	}
 
 	fmt.Printf("Part 1: %d\n", sum)
+	fmt.Printf("Part 2: %d\n", powerSum)
 }
