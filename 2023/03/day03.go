@@ -9,11 +9,13 @@ import (
 type Part struct {
 	Id int
 	Used bool
+	Used2 int
 }
 
 type Symbol struct {
 	Row int
 	Col int
+	Char rune
 }
 
 var Adjacent = [][]int {
@@ -42,13 +44,14 @@ func main() {
 			if ch >= '0' && ch <= '9' {
 				if currentPart == nil {
 					currentPart = new(Part)
+					currentPart.Used2 = -1
 				}
 
 				currentPart.Id = currentPart.Id * 10 + int(ch - '0')
 				parts[fmt.Sprintf("%d,%d", row, col)] = currentPart
 			} else if ch != '.' {
 				currentPart = nil
-				symbol := Symbol{row, col}
+				symbol := Symbol{row, col, ch}
 				symbols = append(symbols, symbol)
 			} else if currentPart != nil {
 				currentPart = nil
@@ -59,16 +62,35 @@ func main() {
 	}
 
 	sum := 0
-	for _, symbol := range symbols {
+	ratioSum := 0
+	for index, symbol := range symbols {
+		numNeighbors := 0
+		ratio := 0
+		if symbol.Char == '*' {
+			ratio = 1
+		}
+
 		for _, delta := range Adjacent {
 			key := fmt.Sprintf("%d,%d", symbol.Row + delta[0], symbol.Col + delta[1])
 			part := parts[key]
-			if part != nil && !part.Used {
-				part.Used = true
-				sum += part.Id
+			if part != nil {
+				if !part.Used {
+					part.Used = true
+					sum += part.Id
+				}
+				if part.Used2 != index {
+					ratio *= part.Id
+					part.Used2 = index
+					numNeighbors++
+				}
 			}
+		}
+
+		if numNeighbors == 2 {
+			ratioSum += ratio
 		}
 	}
 
 	fmt.Printf("Part 1: %d\n", sum)
+	fmt.Printf("Part 2: %d\n", ratioSum)
 }
