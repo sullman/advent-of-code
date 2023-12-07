@@ -39,14 +39,22 @@ type Hand struct {
 	Bid int
 }
 
-func ClassifyHand(cards []byte) byte {
+func ClassifyHand(cards []byte, jokers bool) byte {
 	counts := make([]byte, 15)
+	var numJokers byte = 0
 	for _, card := range cards {
 		counts[card] += 1
 	}
+
+	if jokers {
+		numJokers, counts[1] = counts[1], 0
+	}
+
 	sort.Slice(counts, func(i, j int) bool {
 		return counts[i] > counts[j]
 	})
+
+	counts[0] += numJokers
 
 	if counts[0] == 5 {
 		return FiveOfAKind
@@ -81,14 +89,13 @@ func main() {
 			hand.Cards[i] = CardRanks[cards[i]]
 		}
 		hand.Bid = bid
-		hand.Type = ClassifyHand(hand.Cards[0:])
+		hand.Type = ClassifyHand(hand.Cards[0:], false)
 
 		hands = append(hands, hand)
 	}
 
 	total := 0
-
-	sort.Slice(hands, func(i, j int) bool {
+	cmp := func(i, j int) bool {
 		if hands[i].Type == hands[j].Type {
 			for k := 0; k < len(hands[i].Cards); k++ {
 				if hands[i].Cards[k] != hands[j].Cards[k] {
@@ -100,11 +107,31 @@ func main() {
 		}
 
 		panic("Huh?")
-	})
+	}
+
+	sort.Slice(hands, cmp)
 
 	for i, hand := range hands {
 		total += (i + 1) * hand.Bid
 	}
 
 	fmt.Printf("Part 1: %d\n", total)
+
+	for i := 0; i < len(hands); i++ {
+		for j := 0; j < len(hands[i].Cards); j++ {
+			if hands[i].Cards[j] == 11 {
+				hands[i].Cards[j] = 1
+			}
+		}
+		hands[i].Type = ClassifyHand(hands[i].Cards[0:], true)
+	}
+
+	sort.Slice(hands, cmp)
+	total = 0
+
+	for i, hand := range hands {
+		total += (i + 1) * hand.Bid
+	}
+
+	fmt.Printf("Part 2: %d\n", total)
 }
