@@ -4,10 +4,14 @@ import (
 	"fmt"
 )
 
-func FindNextInSequence(seq []int) int {
-	sum := 0
+func ExtrapolateSequence(seq []int) (int, int) {
+	next := 0
+	prev := 0
+	sign := 1
 	for l := len(seq) - 1; l > 0; l-- {
-		sum += seq[l]
+		next += seq[l]
+		prev += sign * seq[0]
+		sign *= -1
 		nonzero := false
 		for i := 0; i < l; i++ {
 			seq[i] = seq[i + 1] - seq[i]
@@ -15,11 +19,11 @@ func FindNextInSequence(seq []int) int {
 		}
 		if !nonzero { break }
 	}
-	return sum
+	return prev, next
 }
 
 func main() {
-	sum := 0
+	sum1, sum2 := 0, 0
 	var num int
 	var sep rune
 	seq := make([]int, 0)
@@ -31,10 +35,13 @@ func main() {
 		seq = append(seq, num)
 
 		if sep != ' ' {
-			sum += FindNextInSequence(seq)
+			prev, next := ExtrapolateSequence(seq)
+			sum1 += next
+			sum2 += prev
 			seq = []int{}
 		}
 	}
 
-	fmt.Printf("Part 1: %d\n", sum)
+	fmt.Printf("Part 1: %d\n", sum1)
+	fmt.Printf("Part 2: %d\n", sum2)
 }
