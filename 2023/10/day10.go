@@ -31,61 +31,75 @@ func main() {
 		}
 	}
 
-	fmt.Printf("Starting at %d,%d\n", startRow, startCol)
+	row, col := 0, 0
+	edge := North
+	flowNorth := func() {
+		row--
+		length++
+		edge = South
+	}
+	flowSouth := func() {
+		row++
+		length++
+		edge = North
+	}
+	flowEast := func() {
+		col++
+		length++
+		edge = West
+	}
+	flowWest := func() {
+		col--
+		length++
+		edge = East
+	}
 
 	done:
 	for dir := North; ; dir++ {
-		row, col := startRow, startCol
+		length = 0
+		row, col = startRow, startCol
 
 		switch dir {
 		case North:
-			row += 1
+			flowNorth()
 		case East:
-			col -= 1
+			flowEast()
 		case South:
-			row -= 1
+			flowSouth()
 		case West:
-			col += 1
+			flowWest()
 		}
 
-		for length = 1; ; length++ {
+		for {
 			if row < 0 || row >= len(lines) || col < 0 || col >= len(lines[row]) { break }
 
 			tile := lines[row][col]
 			if tile == 'S' {
 				break done
-			} else if tile == '|' && dir == South {
-				row -= 1
-			} else if tile == '|' && dir == North {
-				row += 1
-			} else if tile == '-' && dir == West {
-				col += 1
-			} else if tile == '-' && dir == East {
-				col -= 1
-			} else if tile == 'L' && dir == North {
-				dir = West
-				col += 1
-			} else if tile == 'L' && dir == East {
-				dir = South
-				row -= 1
-			} else if tile == 'J' && dir == North {
-				dir = East
-				col -= 1
-			} else if tile == 'J' && dir == West {
-				dir = South
-				row -= 1
-			} else if tile == '7' && dir == South {
-				dir = East
-				col -= 1
-			} else if tile == '7' && dir == West {
-				dir = North
-				row += 1
-			} else if tile == 'F' && dir == South {
-				dir = West
-				col += 1
-			} else if tile == 'F' && dir == East {
-				dir = North
-				row += 1
+			} else if tile == '|' && edge == South {
+				flowNorth()
+			} else if tile == '|' && edge == North {
+				flowSouth()
+			} else if tile == '-' && edge == West {
+				flowEast()
+			} else if tile == '-' && edge == East {
+				flowWest()
+			} else if tile == 'L' && edge == North {
+				flowEast()
+			} else if tile == 'L' && edge == East {
+				flowNorth()
+			} else if tile == 'J' && edge == North {
+				flowWest()
+			} else if tile == 'J' && edge == West {
+				flowNorth()
+			} else if tile == '7' && edge == South {
+				flowWest()
+			} else if tile == '7' && edge == West {
+				flowSouth()
+			} else if tile == 'F' && edge == South {
+				flowEast()
+			} else if tile == 'F' && edge == East {
+				flowSouth()
 			} else {
 				break
 			}
