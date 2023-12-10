@@ -137,23 +137,12 @@ func main() {
 
 	for row, line := range lines {
 		inside := false
-		toggle := '.'
 		for col, ch := range line {
 			if pipes[row][col] {
 				if ch == 'S' { ch = startingPipe }
 				switch ch {
-				case '|':
+				case '|', 'F', '7':
 					inside = !inside
-				case 'L':
-					inside = !inside
-					toggle = 'J'
-				case 'F':
-					inside = !inside
-					toggle = '7'
-				default:
-					if ch == toggle {
-						inside = !inside
-					}
 				}
 			} else if inside {
 				numInside++
