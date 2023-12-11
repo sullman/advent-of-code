@@ -4,130 +4,91 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"strings"
 )
 
 const (
-	North = iota
-	East
-	South
-	West
+	North = byte(0b0001)
+	East  = byte(0b0010)
+	South = byte(0b0100)
+	West  = byte(0b1000)
 )
 
+var TileTypes = map[rune]byte {
+	'|': North | South,
+	'-': East | West,
+	'F': South | East,
+	'J': North | West,
+	'L': North | East,
+	'7': South | West,
+	'S': North | East | South | West,
+}
+
 func main() {
+	var Inverse [15]byte
+	Inverse[North] = South
+	Inverse[East] = West
+	Inverse[South] = North
+	Inverse[West] = East
+
 	scanner := bufio.NewScanner(os.Stdin)
-	lines := make([]string, 0, 10)
+	tiles := make([][]byte, 0, 10)
 	startRow, startCol := -1, -1
-	var length int
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		lines = append(lines, line)
-		if startRow == -1 {
-			startCol = strings.IndexByte(line, 'S')
-			if startCol != -1 {
-				startRow = len(lines) - 1
+		row := make([]byte, len(line))
+
+		for i, ch := range line {
+			row[i] = TileTypes[ch]
+			if ch == 'S' {
+				startRow = len(tiles)
+				startCol = i
 			}
 		}
+		tiles = append(tiles, row)
 	}
 
-	pipes := make([][]bool, len(lines))
-	row, col := 0, 0
-	edge := North
-	initialEdge := North
-	startingPipe := 'S'
-	flowNorth := func() {
-		row--
-		length++
-		edge = South
-	}
-	flowSouth := func() {
-		row++
-		length++
-		edge = North
-	}
-	flowEast := func() {
-		col++
-		length++
-		edge = West
-	}
-	flowWest := func() {
-		col--
-		length++
-		edge = East
-	}
+	numRows, numCols := len(tiles), len(tiles[0])
+	var length int
+	pipes := make([][]byte, len(tiles))
 
 	done:
-	for dir := North; ; dir++ {
+	for firstDirection := North; ; firstDirection <<= 1 {
 		length = 0
-		row, col = startRow, startCol
-		for i := 0; i < len(pipes); i++ {
-			pipes[i] = make([]bool, len(lines[i]))
+		row, col := startRow, startCol
+		for i := 0; i < len(tiles); i++ {
+			pipes[i] = make([]byte, len(tiles[i]))
 		}
 
-		switch dir {
-		case North:
-			initialEdge = North
-			flowNorth()
-		case East:
-			initialEdge = East
-			flowEast()
-		case South:
-			initialEdge = South
-			flowSouth()
-		case West:
-			initialEdge = West
-			flowWest()
-		}
+		for flow := firstDirection; ; {
+			inv := Inverse[flow]
+			oldRow, oldCol := row, col
 
-		for {
-			pipes[row][col] = true
-			if row < 0 || row >= len(lines) || col < 0 || col >= len(lines[row]) { break }
-
-			tile := lines[row][col]
-			if tile == 'S' {
-				if initialEdge == North && edge == South {
-					startingPipe = '|'
-				} else if initialEdge == North && edge == East {
-					startingPipe = 'L'
-				} else if initialEdge == North && edge == West {
-					startingPipe = 'J'
-				} else if initialEdge == East && edge == South {
-					startingPipe = 'F'
-				} else if initialEdge == East && edge == West {
-					startingPipe = '-'
-				} else if initialEdge == South && edge == West {
-					startingPipe = '7'
-				}
-
-				break done
-			} else if tile == '|' && edge == South {
-				flowNorth()
-			} else if tile == '|' && edge == North {
-				flowSouth()
-			} else if tile == '-' && edge == West {
-				flowEast()
-			} else if tile == '-' && edge == East {
-				flowWest()
-			} else if tile == 'L' && edge == North {
-				flowEast()
-			} else if tile == 'L' && edge == East {
-				flowNorth()
-			} else if tile == 'J' && edge == North {
-				flowWest()
-			} else if tile == 'J' && edge == West {
-				flowNorth()
-			} else if tile == '7' && edge == South {
-				flowWest()
-			} else if tile == '7' && edge == West {
-				flowSouth()
-			} else if tile == 'F' && edge == South {
-				flowEast()
-			} else if tile == 'F' && edge == East {
-				flowSouth()
-			} else {
-				break
+			switch flow {
+			case North:
+				row--
+			case East:
+				col++
+			case South:
+				row++
+			case West:
+				col--
 			}
+
+			if row < 0 || row >= numRows || col < 0 || col >= numCols { break }
+
+			if tiles[row][col] & inv == 0 {
+				if inv == 0 {
+					break done
+				} else {
+					break
+				}
+			}
+
+			length++
+			pipes[oldRow][oldCol] |= flow
+			pipes[row][col] |= inv
+			flow = tiles[row][col] & ^inv
 		}
 	}
 
@@ -135,16 +96,12 @@ func main() {
 
 	numInside := 0
 
-	for row, line := range lines {
+	for _, row := range pipes {
 		inside := false
-		for col, ch := range line {
-			if pipes[row][col] {
-				if ch == 'S' { ch = startingPipe }
-				switch ch {
-				case '|', 'F', '7':
-					inside = !inside
-				}
-			} else if inside {
+		for _, pipe := range row {
+			if pipe & North != 0 {
+				inside = !inside
+			} else if inside && pipe == 0 {
 				numInside++
 			}
 		}
