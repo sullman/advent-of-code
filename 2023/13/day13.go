@@ -3,35 +3,24 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"math/bits"
 	"os"
 )
 
-func FindReflection(nums []uint) int {
-	outer:
-	for i := 1; i < len(nums); i++ {
-		for j := i; j < len(nums) && i - (j - i) > 0; j++ {
-			if nums[j] != nums[i - (j - i) - 1] { continue outer }
-		}
-
-		return i
-	}
-
-	return 0
-}
-
-func FindReflectionWithSmudge(nums []uint) int {
+func FindReflection(nums []uint, requiredSmudges int) int {
 	outer:
 	for i := 1; i < len(nums); i++ {
 		smudges := 0
 
-		for j := i; j < len(nums) && i - (j - i) > 0; j++ {
-			diff := bits.OnesCount(nums[j] ^ nums[i - (j - i) - 1])
-			if diff > 1 { continue outer }
-			if diff == 1 { smudges++ }
+		for j := i; j < len(nums) && i - (j - i) > 0 && smudges <= requiredSmudges; j++ {
+			diff := nums[j] ^ nums[i - (j - i) - 1]
+			if diff != 0 && diff & (diff - 1) == 0 {
+				smudges++
+			} else if diff != 0 {
+				continue outer
+			}
 		}
 
-		if smudges == 1 {
+		if smudges == requiredSmudges {
 			return i
 		}
 	}
@@ -51,15 +40,15 @@ func main() {
 		line := scanner.Text()
 
 		if len(line) == 0 {
-			summary := FindReflection(cols)
+			summary := FindReflection(cols, 0)
 			if (summary == 0) {
-				summary = FindReflection(rows) * 100
+				summary = FindReflection(rows, 0) * 100
 			}
 			sum1 += summary
 
-			summary = FindReflectionWithSmudge(cols)
+			summary = FindReflection(cols, 1)
 			if (summary == 0) {
-				summary = FindReflectionWithSmudge(rows) * 100
+				summary = FindReflection(rows, 1) * 100
 			}
 			sum2 += summary
 
