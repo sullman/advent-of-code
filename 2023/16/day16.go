@@ -19,21 +19,15 @@ type Beam struct {
 	dir byte
 }
 
-func main() {
-	scanner := bufio.NewScanner(os.Stdin)
-	grid := make([][]byte, 0)
-	visited := make([][]byte, 0)
+func CalculateEnergized(grid [][]byte, initial Beam) int {
 	numEnergized := 0
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" { break }
-		grid = append(grid, []byte(line))
-		visited = append(visited, make([]byte, len(line)))
+	visited := make([][]byte, len(grid))
+	for i := 0; i < len(visited); i++ {
+		visited[i] = make([]byte, len(grid[0]))
 	}
 
 	beams := make([]Beam, 1, 16)
-	beams[0] = Beam{0, 0, Right}
+	beams[0] = initial
 
 	for len(beams) > 0 {
 		beam := &beams[0]
@@ -103,5 +97,35 @@ func main() {
 		}
 	}
 
-	fmt.Printf("Part 1: %d\n", numEnergized)
+	return numEnergized
+}
+
+func main() {
+	scanner := bufio.NewScanner(os.Stdin)
+	grid := make([][]byte, 0)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" { break }
+		grid = append(grid, []byte(line))
+	}
+
+	maxEnergized := CalculateEnergized(grid, Beam{0, 0, Right})
+	fmt.Printf("Part 1: %d\n", maxEnergized)
+
+	for row := 0; row < len(grid); row++ {
+		numEnergized := CalculateEnergized(grid, Beam{row, 0, Right})
+		if numEnergized > maxEnergized { maxEnergized = numEnergized }
+		numEnergized = CalculateEnergized(grid, Beam{row, len(grid[0]) - 1, Left})
+		if numEnergized > maxEnergized { maxEnergized = numEnergized }
+	}
+
+	for col := 0; col < len(grid[0]); col++ {
+		numEnergized := CalculateEnergized(grid, Beam{0, col, Down})
+		if numEnergized > maxEnergized { maxEnergized = numEnergized }
+		numEnergized = CalculateEnergized(grid, Beam{len(grid) - 1, col, Up})
+		if numEnergized > maxEnergized { maxEnergized = numEnergized }
+	}
+
+	fmt.Printf("Part 2: %d\n", maxEnergized)
 }
