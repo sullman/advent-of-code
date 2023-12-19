@@ -63,6 +63,79 @@ func Score(part Part) int {
 	return sum
 }
 
+type Range struct { min, max int }
+type Block struct {
+	name string
+	ranges map[string]Range
+}
+
+func FindAllRanges(workflows map[string]Workflow) int {
+	sum := 0
+	blocks := make([]Block, 1, len(workflows))
+	blocks[0] = Block{"in", map[string]Range{
+		"x": Range{1, 4000},
+		"m": Range{1, 4000},
+		"a": Range{1, 4000},
+		"s": Range{1, 4000},
+	}}
+
+	for len(blocks) != 0 {
+		block := blocks[0]
+		blocks = blocks[1:]
+
+		if block.name == "R" {
+			continue
+		} else if block.name == "A" {
+			product := 1
+			for _, r := range block.ranges {
+				product *= (r.max - r.min + 1)
+			}
+			sum += product
+			continue
+		}
+
+		w := workflows[block.name]
+
+		for _, step := range w {
+			if step.operator == None {
+				block.name = step.destination
+				blocks = append(blocks, block)
+				break
+			} else {
+				var branch Block
+				branch.name = step.destination
+				branch.ranges = make(map[string]Range)
+				for key, val := range block.ranges {
+					branch.ranges[key] = val
+				}
+
+				rng := block.ranges[step.field]
+				if step.operator == GT {
+					if step.operand >= rng.min && step.operand < rng.max {
+						block.ranges[step.field] = Range{rng.min, step.operand}
+						branch.ranges[step.field] = Range{step.operand + 1, rng.max}
+						blocks = append(blocks, branch)
+					} else if step.operand < rng.min {
+						blocks = append(blocks, branch)
+						break
+					}
+				} else if step.operator == LT {
+					if step.operand > rng.min && step.operand <= rng.max {
+						block.ranges[step.field] = Range{step.operand, rng.max}
+						branch.ranges[step.field] = Range{rng.min, step.operand - 1}
+						blocks = append(blocks, branch)
+					} else if step.operand > rng.max {
+						blocks = append(blocks, branch)
+						break
+					}
+				}
+			}
+		}
+	}
+
+	return sum
+}
+
 func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 	finishedSteps := false
@@ -112,4 +185,6 @@ func main() {
 	}
 
 	fmt.Printf("Part 1: %d\n", sum)
+
+	fmt.Printf("Part 2: %d\n", FindAllRanges(workflows))
 }
