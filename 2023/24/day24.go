@@ -26,92 +26,87 @@ func (r *Range) Contains(val float64) bool {
 	return val >= r.min && val <= r.max
 }
 
-func InferStartingPosition(x1, y1, vx1, vy1, x2, y2, vx2, vy2, vx, vy int) (int, int) {
-	if vx == vx1 || vx == vx2 || vy == vy1 || vy == vy2 { return 0, 0 }
-	a := float64(vy1 - vy)
-	b := float64(vx1 - vx)
-	c := float64(vx2 - vx)
-	d := float64(vy2 - vy)
-	e := b * d / a - c
-	if e == 0 { return 0, 0 }
+var Primes = []int{2, 3, 5, 7, 11, 13, 17, 23, 29}
 
-	t2 := (b * float64(y1) / a - b * float64(y2) / a + float64(x2) - float64(x1)) / e
-	t1 := (float64(x2) + t2 * c - float64(x1)) / b
+func ZeroOut(row1, row2 []int, col int) []int {
+	rows := make([][]int, 2)
+	rows[0] = make([]int, len(row1))
+	copy(rows[0], row1)
+	rows[1] = make([]int, len(row2))
+	copy(rows[1], row2)
 
-	if t1 < 0 || t2 < 0 { return 0, 0 }
-
-	x := int(float64(x1) + t1 * float64(vx1) - t1 * float64(vx) + 0.5)
-	y := int(float64(y1) + t1 * float64(vy1) - t1 * float64(vy) + 0.5)
-
-	return x, y
-}
-
-func Part2(hailstones []Hailstone) int {
-	var delta, start, velocity Triple
-	var h1, h2 *Hailstone
-	delta.x = 1
-	spiral := 1
-
-	outer:
-	for spiral <= 1000 {
-		for 2 * velocity.x * delta.x < spiral && 2 * velocity.y * delta.y < spiral {
-			if velocity.x != 0 && velocity.y != 0 {
-				h1, h2 = nil, nil
-				var i int
-				for i < len(hailstones) {
-					h2 = nil
-					for ; h2 == nil; i++ {
-						if hailstones[i].velocity.x == velocity.x || hailstones[i].velocity.y == velocity.y { continue }
-						if h1 == nil {
-							h1 = &(hailstones[i])
-						} else {
-							h2 = &(hailstones[i])
-						}
-					}
-
-					start.x, start.y = InferStartingPosition(h1.point.x, h1.point.y, h1.velocity.x, h1.velocity.y, h2.point.x, h2.point.y, h2.velocity.x, h2.velocity.y, velocity.x, velocity.y)
-					if start.x != 0 { break }
-				}
-
-				inner:
-				for i < len(hailstones) {
-					h2 = nil
-					for ; h2 == nil && i < len(hailstones); i++ {
-						if hailstones[i].velocity.x == velocity.x || hailstones[i].velocity.y == velocity.y { continue }
-						h2 = &(hailstones[i])
-					}
-					if h2 != nil {
-						x, y := InferStartingPosition(h1.point.x, h1.point.y, h1.velocity.x, h1.velocity.y, h2.point.x, h2.point.y, h2.velocity.x, h2.velocity.y, velocity.x, velocity.y)
-						if x == start.x && y == start.y {
-							fmt.Printf("Success?\n")
-							break outer
-						} else if x != 0 {
-							// fmt.Printf("For %d,%d start=%d,%d does not equal check %d,%d\n", velocity.x, velocity.y, start.x, start.y, x, y)
-							break inner
-						}
-					}
-				}
+	for _, r := range rows {
+		if r[col] < 0 {
+			for c := col; c < len(r); c++ {
+				r[c] *= -1
 			}
-			velocity.x += delta.x
-			velocity.y += delta.y
-		}
-		if delta.x == 0 {
-			delta.x, delta.y = delta.y * -1, 0
-			spiral++
-		} else {
-			delta.y, delta.x = delta.x, 0
 		}
 	}
 
-	fmt.Printf("Solved for x,y=%d,%d\n", start.x, start.y)
-	t1 := (start.x - h1.point.x) / (h1.velocity.x - velocity.x)
-	t2 := (start.x - h2.point.x) / (h2.velocity.x - velocity.x)
-	velocity.z = (h1.point.z - h2.point.z + t1 * h1.velocity.z - t2 * h2.velocity.z) / (t1 - t2)
-	start.z = h1.point.z + t1 * h1.velocity.z - t1 * velocity.z
+	if rows[1][col] > rows[0][col] {
+		rows[0], rows[1] = rows[1], rows[0]
+	}
 
-	fmt.Printf("Think the answer is %v @ %v\n", start, velocity)
+	for rows[1][col] != 0 {
+		row := make([]int, len(row1))
+		for c := col; c < len(row); c++ {
+			// TODO: Can't guarantee this won't overflow int64 :/
+			row[c] = rows[0][c] - rows[1][c]
+		}
+		for i := 0; i < len(Primes); i++ {
+			p := Primes[i]
+			divis := true
+			for c := col; c < len(row) && divis; c++ {
+				if row[c] % p != 0 { divis = false }
+			}
+			if divis {
+				fmt.Printf("Reducing by /%d\n", p)
+				for c := col; c < len(row); c++ {
+					row[c] /= p
+				}
+				i--
+			}
+		}
 
-	return start.x + start.y + start.z
+		if row[col] > rows[1][col] {
+			rows[0] = row
+		} else {
+			rows[0], rows[1] = rows[1], row
+		}
+	}
+
+	return rows[1]
+}
+
+func SolveLinearEquations(values [][]int) []int {
+	solution := make([]int, len(values))
+	var row int
+
+	for col := 0; col < len(solution); col++ {
+		// First, make sure the first row is nonzero
+		for row = col; row < len(values); row++ {
+			if values[row][col] != 0 { break }
+		}
+		if row != col {
+			values[col], values[row] = values[row], values[col]
+		}
+
+		// Now zero out all but the first
+		for row = col + 1; row < len(values); row++ {
+			values[row] = ZeroOut(values[col], values[row], col)
+		}
+	}
+
+	lastIndex := len(values[0]) - 1
+	for col := len(solution) - 1; col >= 0; col-- {
+		val := values[col][lastIndex]
+		for c := col + 1; c < lastIndex; c++ {
+			val -= values[col][c] * solution[c]
+		}
+		solution[col] = val / values[col][col]
+	}
+
+	return solution
 }
 
 func main() {
@@ -155,5 +150,81 @@ func main() {
 
 	fmt.Printf("Part 1: %d\n", total)
 
-	fmt.Printf("Part 2: %d\n", Part2(hailstones))
+	// The underlying algebra is worked out elsewhere, but the general idea is
+	// that for our `rock` and any `hail`:
+	//
+	// rock.point + t * rock.velocity = hail.point + t * hail.velocity
+	// (rearranges to)
+	// (rock.point - hail.point) = -t * (rock.velocity - hail.velocity)
+	//
+	// You can ignore the actual value of t and consider these parallel vectors,
+	// which means their cross product must be zero. Those cross products are
+	// where we derive the coefficients for our linear equations. 6 equations
+	// for 6 unknowns if we use three hailstones.
+	equations := make([][]int, 6)
+	h1, h2, h3 := hailstones[0], hailstones[1], hailstones[2]
+	// [x, y, z, vx, vy, vz, c]
+	equations[0] = []int{
+		h2.velocity.y - h1.velocity.y,
+		h1.velocity.x - h2.velocity.x,
+		0,
+		h1.point.y - h2.point.y,
+		h2.point.x - h1.point.x,
+		0,
+		h2.point.x * h2.velocity.y - h1.point.x * h1.velocity.y + h1.point.y * h1.velocity.x - h2.point.y * h2.velocity.x,
+	}
+
+	equations[1] = []int {
+		h3.velocity.y - h1.velocity.y,
+		h1.velocity.x - h3.velocity.x,
+		0,
+		h1.point.y - h3.point.y,
+		h3.point.x - h1.point.x,
+		0,
+		h3.point.x * h3.velocity.y - h1.point.x * h1.velocity.y + h1.point.y * h1.velocity.x - h3.point.y * h3.velocity.x,
+	}
+
+	equations[2] = []int {
+		h2.velocity.z - h1.velocity.z,
+		0,
+		h1.velocity.x - h2.velocity.x,
+		h1.point.z - h2.point.z,
+		0,
+		h2.point.x - h1.point.x,
+		h2.point.x * h2.velocity.z - h1.point.x * h1.velocity.z + h1.point.z * h1.velocity.x - h2.point.z * h2.velocity.x,
+	}
+
+	equations[3] = []int {
+		h3.velocity.z - h1.velocity.z,
+		0,
+		h1.velocity.x - h3.velocity.x,
+		h1.point.z - h3.point.z,
+		0,
+		h3.point.x - h1.point.x,
+		h3.point.x * h3.velocity.z - h1.point.x * h1.velocity.z + h1.point.z * h1.velocity.x - h3.point.z * h3.velocity.x,
+	}
+
+	equations[4] = []int {
+		0,
+		h2.velocity.z - h1.velocity.z,
+		h1.velocity.y - h2.velocity.y,
+		0,
+		h1.point.z - h2.point.z,
+		h2.point.y - h1.point.y,
+		h2.point.y * h2.velocity.z - h1.point.y * h1.velocity.z + h1.point.z * h1.velocity.y - h2.point.z * h2.velocity.y,
+	}
+
+	equations[5] = []int {
+		0,
+		h3.velocity.z - h1.velocity.z,
+		h1.velocity.y - h3.velocity.y,
+		0,
+		h1.point.z - h3.point.z,
+		h3.point.y - h1.point.y,
+		h3.point.y * h3.velocity.z - h1.point.y * h1.velocity.z + h1.point.z * h1.velocity.y - h3.point.z * h3.velocity.y,
+	}
+
+	solution := SolveLinearEquations(equations)
+	fmt.Printf("Solution: %d, %d, %d @ %d, %d, %d\n", solution[0], solution[1], solution[2], solution[3], solution[4], solution[5])
+	fmt.Printf("Part 2: %d\n", solution[0] + solution[1] + solution[2])
 }
