@@ -7,87 +7,31 @@ const DIRECTIONS = [
   [0, -1],
 ];
 
-function findPerimeter(grid, row, col, visited) {
+function findRegion(grid, row, col, region, visited) {
   const key = `${row},${col}`;
   const crop = grid[row][col];
-  let perimeter = 0;
 
-  if (visited.has(key)) return 0;
+  if (visited.has(key)) return;
 
   visited.add(key);
+  region.area++;
 
-  for (const dir of DIRECTIONS) {
+  for (let i = 0; i < DIRECTIONS.length; i++) {
+    const dir = DIRECTIONS[i];
     if (crop === grid[row + dir[0]]?.[col + dir[1]]) {
-      perimeter += findPerimeter(grid, row + dir[0], col + dir[1], visited);
+      findRegion(grid, row + dir[0], col + dir[1], region, visited);
     } else {
-      perimeter++;
+      region.perimeter++;
+      region.edges++;
+
+      visited.add(`${crop},${row},${col},${i}`);
+      for (const dir2 of DIRECTIONS) {
+        if (visited.has(`${crop},${row + dir2[0]},${col + dir2[1]},${i}`)) {
+          region.edges--;
+        }
+      }
     }
   }
-
-  return perimeter;
-}
-
-function findEdges(grid, row, col, visited) {
-  const crop = grid[row][col];
-  let edges = 0;
-
-  if (visited.has(`${row},${col}`)) return 0;
-
-  visited.add(`${row},${col}`);
-
-  // Top edge
-  if (crop === grid[row - 1]?.[col]) {
-    edges += findEdges(grid, row - 1, col, visited);
-  } else if (!visited.has(`${row},${col},top`)) {
-    edges++;
-    for (let c = col; grid[row][c] === crop && grid[row - 1]?.[c] !== crop; c++) {
-      visited.add(`${row},${c},top`);
-    }
-    for (let c = col - 1; grid[row][c] === crop && grid[row - 1]?.[c] !== crop; c--) {
-      visited.add(`${row},${c},top`);
-    }
-  }
-
-  // Bottom edge
-  if (crop === grid[row + 1]?.[col]) {
-    edges += findEdges(grid, row + 1, col, visited);
-  } else if (!visited.has(`${row},${col},bottom`)) {
-    edges++;
-    for (let c = col; grid[row][c] === crop && grid[row + 1]?.[c] !== crop; c++) {
-      visited.add(`${row},${c},bottom`);
-    }
-    for (let c = col - 1; grid[row][c] === crop && grid[row + 1]?.[c] !== crop; c--) {
-      visited.add(`${row},${c},bottom`);
-    }
-  }
-
-  // Right edge
-  if (crop === grid[row][col + 1]) {
-    edges += findEdges(grid, row, col + 1, visited);
-  } else if (!visited.has(`${row},${col},right`)) {
-    edges++;
-    for (let r = row; grid[r]?.[col] === crop && grid[r][col + 1] !== crop; r++) {
-      visited.add(`${r},${col},right`);
-    }
-    for (let r = row - 1; grid[r]?.[col] === crop && grid[r][col + 1] !== crop; r--) {
-      visited.add(`${r},${col},right`);
-    }
-  }
-
-  // Left edge
-  if (crop === grid[row][col - 1]) {
-    edges += findEdges(grid, row, col - 1, visited);
-  } else if (!visited.has(`${row},${col},left`)) {
-    edges++;
-    for (let r = row; grid[r]?.[col] === crop && grid[r][col - 1] !== crop; r++) {
-      visited.add(`${r},${col},left`);
-    }
-    for (let r = row - 1; grid[r]?.[col] === crop && grid[r][col - 1] !== crop; r--) {
-      visited.add(`${r},${col},left`);
-    }
-  }
-
-  return edges;
 }
 
 async function run() {
@@ -102,19 +46,20 @@ async function run() {
   let part1 = 0;
   let part2 = 0;
   const visited = new Set();
-  const visited2 = new Set();
 
   for (let row = 0; row < grid.length; row++) {
     for (let col = 0; col < grid[row].length; col++) {
       if (visited.has(`${row},${col}`)) continue;
 
-      const before = visited.size;
-      const perimeter = findPerimeter(grid, row, col, visited);
-      const area = visited.size - before;
-      const edges = findEdges(grid, row, col, visited2);
+      const region = {
+        area: 0,
+        edges: 0,
+        perimeter: 0,
+      };
+      findRegion(grid, row, col, region, visited);
 
-      part1 += perimeter * area;
-      part2 += edges * area;
+      part1 += region.perimeter * region.area;
+      part2 += region.edges * region.area;
     }
   }
 
