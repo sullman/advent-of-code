@@ -66,7 +66,6 @@ async function run() {
     dir: 0,
     score: 0,
     path: new Set([`${row},${col}`]),
-    // bestPossible: Math.abs(endRow - row) + Math.abs(endCol - col) + TURN_SCORE
   });
 
   while (queue.length) {
