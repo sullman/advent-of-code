@@ -23,61 +23,67 @@ function insertSorted(queue, seen, state) {
   queue.push(state);
 }
 
-async function run() {
-  const rl = readline.createInterface({ input: process.stdin });
-  let maxX = 0;
-  let maxY = 0;
-  const bytes = [];
-
-  for await (const line of rl) {
-    if (!line) continue;
-    const [x, y] = line.split(',').map(Number);
-    bytes.push([x, y]);
-    if (x > maxX) maxX = x;
-    if (y > maxY) maxY = y;
-  }
-
-  const limit = maxX < 7 ? 12 : 1024;
-
-  const grid = new Array(maxX + 1);
-  for (let x = 0; x < grid.length; x++) {
-    grid[x] = (new Array(maxY + 1)).fill(true);
-  }
-
-  for (let i = 0; i < limit; i++) {
-    grid[bytes[i][0]][bytes[i][1]] = false;
-  }
-
+function minPath(gridSize, bytes, numBytes) {
   const seen = new Map();
   const queue = [];
   insertSorted(queue, seen, {
     x: 0,
     y: 0,
     distance: 0,
-    bestPossible: maxX + maxY
+    bestPossible: gridSize + gridSize
   });
 
   while (queue.length) {
     const state = queue.shift();
-    if (state.x === maxX && state.y === maxY) {
-      console.log('Part 1:', state.distance);
-      break;
+    if (state.x === gridSize && state.y === gridSize) {
+      return state.distance;
     }
 
     for (const [dx, dy] of DIRECTIONS) {
-      if (grid[state.x + dx]?.[state.y + dy]) {
-        const newX = state.x + dx;
-        const newY = state.y + dy;
+      const newX = state.x + dx;
+      const newY = state.y + dy;
+      if (newX >= 0 && newX <= gridSize && newY >= 0 && newY <= gridSize && !(bytes.get(`${newX},${newY}`) <= numBytes)) {
         insertSorted(queue, seen, {
           x: newX,
           y: newY,
           distance: state.distance + 1,
-          bestPossible: state.distance + 1 + (maxX - newX) + (maxY - newY)
+          bestPossible: state.bestPossible + 1 - dx - dy
         });
       }
     }
   }
+}
 
+async function run() {
+  const rl = readline.createInterface({ input: process.stdin });
+  let max = 0;
+  const bytes = new Map();
+  const labels = [];
+
+  for await (const line of rl) {
+    if (!line) continue;
+    const [x, y] = line.split(',').map(Number);
+    bytes.set(`${x},${y}`, bytes.size);
+    labels.push(`${x},${y}`);
+    if (x > max) max = x;
+    if (y > max) max = y;
+  }
+
+  console.log('Part 1:', minPath(max, bytes, max < 7 ? 12 : 1024));
+
+  let good = 0;
+  let bad = bytes.size - 1;
+
+  while (good < bad - 1) {
+    const check = good + ((bad - good) >> 2);
+    if (minPath(max, bytes, check)) {
+      good = check;
+    } else {
+      bad = check;
+    }
+  }
+
+  console.log('Part 2:', labels[bad]);
 }
 
 run().then(() => {
