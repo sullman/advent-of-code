@@ -28,9 +28,35 @@ function solveForward(wires, name) {
   return val;
 }
 
+const GATES = {
+  AND: '&',
+  OR: '|',
+  XOR: '^',
+};
+
+function serialize(input1, input2, gate) {
+  if (input1.localeCompare(input2) < 0) {
+    return `${input1}${GATES[gate] || gate}${input2}`;
+  }
+
+  return `${input2}${GATES[gate] || gate}${input1}`;
+}
+
+function numberWire(letter, num) {
+  return `${letter}${num.toString().padStart(2, '0')}`;
+}
+
+function swap(wires, byInput, a, b) {
+  let wire = wires.get(a);
+  byInput.set(serialize(wire.input[0], wire.input[1], wire.gate), b);
+  wire = wires.get(b);
+  byInput.set(serialize(wire.input[0], wire.input[1], wire.gate), a);
+}
+
 async function run() {
   const rl = readline.createInterface({ input: process.stdin });
   const wires = new Map();
+  const byInput = new Map();
   let match;
 
   for await (const line of rl) {
@@ -40,12 +66,13 @@ async function run() {
     } else if (match = GATE.exec(line)) {
       const [, input1, gate, input2, output] = match;
       wires.set(output, { input: [input1, input2], gate });
+      byInput.set(serialize(input1, input2, gate), output);
     }
   }
 
   const z = [];
   for (let i = 0; ; i++) {
-    const name = `z${i.toString().padStart(2, '0')}`;
+    const name = numberWire('z', i);
     if (wires.has(name)) {
       z.unshift(solveForward(wires, name).toString());
     } else {
@@ -54,6 +81,51 @@ async function run() {
   }
 
   console.log('Part 1:', parseInt(z.join(''), 2));
+
+  // Part 2
+  let prev = [];
+  const swapped = [];
+  for (let i = 0; ; i++) {
+    const name = numberWire('z', i);
+    if (wires.has(name)) {
+      const wire = wires.get(name);
+
+      if (i >= 2) {
+        const a = byInput.get(serialize(numberWire('x', i), numberWire('y', i), 'XOR'));
+        if (!a) break;
+        const b = byInput.get(serialize(numberWire('x', i - 1), numberWire('y', i - 1), 'AND'));
+        const c = byInput.get(serialize(prev[0], prev[1], 'AND'));
+        const d = byInput.get(serialize(b, c, 'OR'));
+        const e = byInput.get(serialize(a, d, '^'));
+
+        if (!e) {
+          if (wire.input.includes(a)) {
+            const other = wire.input.find(n => n !== a);
+            swap(wires, byInput, d, other);
+            swapped.push(d, other);
+          } else {
+            const other = wire.input.find(n => n !== d);
+            swap(wires, byInput, a, other);
+            swapped.push(a, other);
+          }
+          prev = wire.input;
+        } else if (e !== name) {
+          swapped.push(name, e);
+          swap(wires, byInput, e, name);
+          prev = [a, d];
+        } else {
+          prev = wire.input;
+        }
+      } else {
+        prev = wire.input;
+      }
+    } else {
+      break;
+    }
+  }
+
+  if (swapped.length !== 8) throw new Error('Uh-oh');
+  console.log('Part 2:', swapped.sort().join(','));
 }
 
 run().then(() => {
