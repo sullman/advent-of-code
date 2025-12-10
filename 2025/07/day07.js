@@ -9,17 +9,17 @@ async function run() {
   for await (const line of rl) {
     if (beams.length === 0) {
       beams.length = line.length;
-      beams.fill(false);
-      beams[line.indexOf('S')] = true;
+      beams.fill(0);
+      beams[line.indexOf('S')] = 1;
       continue;
     }
 
     const newBeams = [...beams];
     for (let i = 0; i < line.length; i++) {
       if (beams[i] && line[i] === '^') {
-        newBeams[i - 1] = true;
-        newBeams[i + 1] = true;
-        newBeams[i] = false;
+        newBeams[i - 1] += beams[i];
+        newBeams[i + 1] += beams[i];
+        newBeams[i] = 0;
         part1++;
       }
     }
@@ -27,6 +27,7 @@ async function run() {
   }
 
   console.log('Part 1:', part1);
+  console.log('Part 2:', beams.reduce((acc, val) => acc + val, 0))
 }
 
 run().then(() => {
