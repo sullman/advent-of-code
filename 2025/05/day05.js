@@ -20,7 +20,28 @@ async function run() {
     }
   }
 
+  const merged = [];
+  for (const range of ranges) {
+    const toMerge = [range];
+    for (let i = merged.length - 1; i >= 0; i--) {
+      const other = merged[i];
+      if (other[1] < range[0] || other[0] > range[1]) continue;
+      toMerge.push(other);
+      merged.splice(i, 1);
+    }
+    merged.push([
+      Math.min(...toMerge.map(r => r[0])),
+      Math.max(...toMerge.map(r => r[1]))
+    ]);
+  }
+
+  let part2 = 0;
+  for (const [low, high] of merged) {
+    part2 += (high - low) + 1;
+  }
+
   console.log('Part 1:', part1);
+  console.log('Part 2:', part2);
 }
 
 run().then(() => {
