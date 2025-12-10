@@ -19,26 +19,33 @@ async function run() {
       const insertIndex = shortest.findIndex(s => s.distance > distance);
       if (insertIndex !== -1) {
         shortest.splice(insertIndex, 0, { distance, from: `${x},${y},${z}`, to: `${a},${b},${c}` });
-        shortest.length = NUM_CONNECTIONS;
+        // This is a bogus clamping, no guarantee that it will finish with those connections
+        shortest.length = NUM_CONNECTIONS * 7;
       }
     }
 
     boxes.push([x, y, z]);
   }
 
-  for (const { from, to } of shortest) {
+  for (let i = 0; i < shortest.length; i++) {
+    if (i === NUM_CONNECTIONS) {
+      circuits.sort((a, b) => b.size - a.size);
+      console.log('Part 1:', circuits[0].size * circuits[1].size * circuits[2].size);
+    }
+
+    const { from, to } = shortest[i];
     const fromIndex = circuits.findIndex(c => c.has(from));
     const toIndex = circuits.findIndex(c => c.has(to));
     if (fromIndex === toIndex) continue;
+    if (circuits.length === 2) {
+      console.log('Part 2:', Number.parseInt(from, 10) * Number.parseInt(to, 10));
+      break;
+    }
+
     circuits.push(circuits[fromIndex].union(circuits[toIndex]));
     circuits.splice(Math.max(fromIndex, toIndex), 1);
     circuits.splice(Math.min(fromIndex, toIndex), 1);
   }
-
-  circuits.sort((a, b) => b.size - a.size);
-  circuits.length = 3;
-
-  console.log('Part 1:', circuits.reduce((product, circuit) => product * circuit.size, 1));
 }
 
 run().then(() => {
